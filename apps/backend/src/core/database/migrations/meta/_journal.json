@@ -1,0 +1,153 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1774671502581,
+      "tag": "0000_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774679902489,
+      "tag": "0001_local_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774700000000,
+      "tag": "0002_align_sessions_sap_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1774762204879,
+      "tag": "0003_slippery_the_anarchist",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774905025492,
+      "tag": "0004_tense_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774962911717,
+      "tag": "0005_so_initial",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775000000000,
+      "tag": "0006_salud_ocupacional_rbac_apps",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775100000000,
+      "tag": "0007_role_permissions_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775200000000,
+      "tag": "0008_module_profiles_app_permissions_json",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775300000000,
+      "tag": "0009_module_smtp_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775400000000,
+      "tag": "0010_system_module_smtp_row",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775500000000,
+      "tag": "0011_so_consultations_correlative",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1775600000000,
+      "tag": "0012_so_consultations_sap_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1775700000000,
+      "tag": "0013_eiis_trabajadores_stext_ceco_datin",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775750000000,
+      "tag": "0014_sistemas_rbac_apps",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1775800000000,
+      "tag": "0015_module_glpi_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1775900000000,
+      "tag": "0016_module_sharepoint_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1776000000000,
+      "tag": "0017_eiis_trabajadores_jefe",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1776100000000,
+      "tag": "0018_worker_signatures",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1776200000000,
+      "tag": "0019_workforce_subdivision_role_assignees",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1776300000000,
+      "tag": "0020_workforce_boleta_export_settings",
+      "breakpoints": true
+    }
+  ]
+}

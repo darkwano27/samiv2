@@ -1,0 +1,229 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-sami-v2-api",
+    "name": "SAMI v2 — API",
+    "description": "Colección para probar el backend Nest (`/api`).\n\n**Variables:** `baseUrl` por defecto `http://localhost:3000/api`.\n\n**Cookies:** `POST /auth/login` y `POST /auth/change-password` devuelven `Set-Cookie: sami_session=...` (HttpOnly). En Postman, activá el almacenamiento de cookies para el dominio (p. ej. `localhost`) para que las siguientes peticiones envíen la cookie automáticamente.\n\n**Logout:** `POST /auth/logout` invalida Redis + borra la cookie (cookies guardadas en Postman).\n\n**Flujo típico:** Identify → según `auth_type`, Login (AD o local) o Register → si `requires_password_change`, Change password con `temp_token` del login.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "sap_code",
+      "value": "12345678"
+    },
+    {
+      "key": "dni",
+      "value": "12345678"
+    },
+    {
+      "key": "temp_token",
+      "value": ""
+    },
+    {
+      "key": "role_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": "Comprueba que el servidor responde."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST Identify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sap_code\": \"{{sap_code}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/identify",
+            "description": "Paso 1 del login. Respuesta 200: `found`, `auth_type` (`ad` | `local` | `new-local`), `worker_name`. 404 si el `pernr` no está en SAP. 403 si el trabajador no está activo (`stat2`)."
+          },
+          "response": []
+        },
+        {
+          "name": "GET Me (cookie sami_session)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/auth/me",
+            "description": "Valida la cookie HttpOnly `sami_session` contra Redis. 200: `sap_code`, `worker_name`, `worker_id`, `division`, `subdivision`, `is_superadmin`, `app_roles` (RBAC + caché Redis `rbac:perms:*`). 401 si no hay cookie o la sesión no existe/expiró."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/auth/logout",
+            "description": "Revoca sesión en Redis, quita el id del set `user_sessions:*` y borra la cookie `sami_session`. 200 `{ ok: true }` (idempotente sin cookie)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sap_code\": \"{{sap_code}}\",\n  \"password\": \"tu-password\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "AD: contraseña de red. Local: contraseña SAMI.\n\nSi la respuesta incluye `token`, el backend setea cookie `sami_session`.\nSi incluye `requires_password_change: true`, usá `temp_token` en **Change password** (no hay cookie de sesión aún).\n\nRate limit: 10 req/min por IP."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Register (primer acceso local)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sap_code\": \"{{sap_code}}\",\n  \"dni\": \"{{dni}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register",
+            "description": "Solo workers **sin** `correo_corp` en SAP y sin fila en `local_auth`. DNI debe coincidir con `perid` en `eiis_trabajadores`. Envía contraseña temporal al correo `correo` del maestro."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Recover password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sap_code\": \"{{sap_code}}\",\n  \"dni\": \"{{dni}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/recover",
+            "description": "Usuario local olvidó contraseña. No aplica a usuarios AD (`correo_corp`)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Change password (temp token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"temp_token\": \"{{temp_token}}\",\n  \"new_password\": \"NuevaPass1\",\n  \"confirm_password\": \"NuevaPass1\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/change-password",
+            "description": "Después de login local con contraseña temporal: pegá el UUID de `temp_token` en la variable de colección o en el body. Cumplir: mín. 8 caracteres, 1 mayúscula, 1 número. Al terminar, se setea `sami_session`."
+          },
+          "response": []
+        }
+      ],
+      "description": "Contrato JSON en **snake_case**. Prefijo global: `/api`."
+    },
+    {
+      "name": "RBAC",
+      "item": [
+        {
+          "name": "GET Rbac smoke",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/rbac-smoke",
+            "description": "Endpoint de prueba del `RbacGuard`: exige cookie `sami_session` y permiso `mis-consultas` / `listar` / `read` (o superadmin o admin de módulo `consultas`). 401 sin sesión, 403 sin permiso. Ver `docs/features/rbac-guard-require-permission.md`."
+          },
+          "response": []
+        }
+      ],
+      "description": "Guard global opt-in: solo rutas con `@RequirePermission`."
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "GET RBAC catalog",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/rbac/catalog",
+            "description": "Solo **superadmin** (`SuperadminGuard`). Lista apps, roles y features. Ver `docs/features/rbac-admin-api.md`."
+          },
+          "response": []
+        },
+        {
+          "name": "GET Worker assignments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/admin/rbac/workers/{{sap_code}}/assignments",
+            "description": "Asignaciones del worker (`workers.id`, mismo valor que `sap_code` / `pernr`)."
+          },
+          "response": []
+        },
+        {
+          "name": "POST Worker assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"worker_id\": \"{{sap_code}}\",\n  \"role_id\": \"{{role_id}}\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/rbac/worker-assignments",
+            "description": "Crea asignación manual e invalida caché `rbac:perms:{worker_id}`. 409 si ya existe la misma asignación manual."
+          },
+          "response": []
+        }
+      ],
+      "description": "`/api/admin/*` — requiere sesión + superadmin."
+    }
+  ]
+}
