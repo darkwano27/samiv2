@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" fill="none" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sami-hero-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="45%" stop-color="#21A795"/>
+      <stop offset="100%" stop-color="#115e59"/>
+    </linearGradient>
+    <pattern id="sami-hero-grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="sami-hero-glow" cx="70%" cy="25%" r="50%">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.14)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="1600" fill="url(#sami-hero-bg)"/>
+  <rect width="1200" height="1600" fill="url(#sami-hero-grid)"/>
+  <ellipse cx="880" cy="320" rx="420" ry="380" fill="url(#sami-hero-glow)"/>
+  <ellipse cx="220" cy="1280" rx="500" ry="440" fill="rgba(0,0,0,0.14)"/>
+</svg>
