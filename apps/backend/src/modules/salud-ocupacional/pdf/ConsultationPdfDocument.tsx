@@ -11,31 +11,31 @@ const TEAL = '#21a795';
 const styles = StyleSheet.create({
   page: {
     ...arisPdfPageStyles.page,
-    paddingTop: 28,
-    paddingHorizontal: 36,
-    fontSize: 10,
+    paddingTop: 14,
+    paddingBottom: 38,
+    paddingHorizontal: 26,
+    fontSize: 8.5,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 5,
   },
   brandLeft: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  /** Caja fija alineada al bloque SAMI; el PNG escala con objectFit. */
   logoWrap: {
-    width: 158,
-    height: 50,
+    width: 128,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoImg: {
-    width: 154,
-    height: 46,
+    width: 124,
+    height: 32,
     objectFit: 'contain' as const,
   },
   brandMark: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 800,
     color: TEAL,
     letterSpacing: -0.5,
@@ -47,50 +47,53 @@ const styles = StyleSheet.create({
     marginLeft: 2,
     justifyContent: 'center',
   },
-  brandSam: { fontSize: 10, fontWeight: 600, color: '#333' },
-  brandSub: { fontSize: 7, color: '#888', marginTop: 1 },
-  metaRight: { fontSize: 8, color: '#888', textAlign: 'right' },
+  brandSam: { fontSize: 9, fontWeight: 600, color: '#333' },
+  brandSub: { fontSize: 6.5, color: '#888', marginTop: 1 },
+  metaRight: { fontSize: 7.5, color: '#888', textAlign: 'right' },
   banner: {
     backgroundColor: TEAL,
-    paddingVertical: 8,
-    marginBottom: 14,
+    paddingVertical: 4,
+    marginBottom: 6,
     alignItems: 'center',
   },
   bannerTxt: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: 700,
     color: '#fff',
-    letterSpacing: 0.8,
+    letterSpacing: 0.45,
   },
-  sectionWrap: { marginBottom: 14 },
+  sectionWrap: { marginBottom: 6 },
+  /** Bloques 1–2 más densos */
+  sectionTight: { marginBottom: 5 },
   tab: {
     alignSelf: 'flex-start',
     backgroundColor: TEAL,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
   },
   tabTxt: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: 700,
     color: '#fff',
-    letterSpacing: 0.4,
+    letterSpacing: 0.35,
   },
   box: {
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    borderRadius: 4,
+    borderRadius: 3,
     borderTopLeftRadius: 0,
     overflow: 'hidden',
   },
   row: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#e8e8e8' },
   rowLast: { flexDirection: 'row' },
   cellLabel: {
-    width: '28%',
-    padding: 6,
-    backgroundColor: '#f8f8f8',
-    fontSize: 8,
+    width: '24%',
+    paddingVertical: 2,
+    paddingHorizontal: 3,
+    backgroundColor: '#f5f5f5',
+    fontSize: 7,
     fontWeight: 700,
     color: '#555',
     borderRightWidth: 0.5,
@@ -98,47 +101,29 @@ const styles = StyleSheet.create({
   },
   cellVal: {
     flex: 1,
-    padding: 6,
-    fontSize: 9,
+    paddingVertical: 2,
+    paddingHorizontal: 3,
+    fontSize: 7.5,
     color: '#171717',
-    lineHeight: 1.35,
+    lineHeight: 1.25,
   },
   cellValFull: {
     flex: 1,
-    padding: 6,
-    fontSize: 9,
+    paddingVertical: 2,
+    paddingHorizontal: 3,
+    fontSize: 7.5,
     color: '#171717',
-    lineHeight: 1.4,
+    lineHeight: 1.25,
   },
   emailAccent: { color: TEAL },
-  /** Fila correo + documento (padding reducido). */
-  cellLabelTight: {
-    width: '22%',
-    paddingVertical: 4,
-    paddingHorizontal: 5,
-    backgroundColor: '#f8f8f8',
-    fontSize: 7,
-    fontWeight: 700,
-    color: '#555',
-    borderRightWidth: 0.5,
-    borderRightColor: '#e8e8e8',
-  },
-  cellValTight: {
-    flex: 1,
-    paddingVertical: 4,
-    paddingHorizontal: 5,
-    fontSize: 8,
-    color: '#171717',
-    lineHeight: 1.3,
-  },
   badge: {
     alignSelf: 'flex-start',
     backgroundColor: '#fef3c7',
     color: '#92400e',
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    fontSize: 8,
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    fontSize: 7,
     fontWeight: 600,
   },
   dxHeader: {
@@ -148,44 +133,152 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e8e8e8',
   },
   dxTh: {
-    padding: 5,
-    fontSize: 8,
+    padding: 4,
+    fontSize: 7,
     fontWeight: 700,
     color: '#555',
     borderRightWidth: 0.5,
     borderRightColor: '#e8e8e8',
   },
   dxRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#e8e8e8' },
-  dxCell: { padding: 5, fontSize: 9, borderRightWidth: 0.5, borderRightColor: '#e8e8e8' },
+  dxCell: { padding: 4, fontSize: 8, borderRightWidth: 0.5, borderRightColor: '#e8e8e8' },
   dxCode: { fontFamily: 'Roboto', color: TEAL, fontWeight: 600 },
   rxBlock: {
-    padding: 6,
+    padding: 5,
     borderBottomWidth: 0.5,
     borderBottomColor: '#e8e8e8',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  rxLeft: { flex: 1, paddingRight: 8 },
-  rxTitle: { fontSize: 10, fontWeight: 700, color: '#115e59' },
-  rxMeta: { fontSize: 8, color: '#666', marginTop: 2 },
+  rxTitle: { fontSize: 9, fontWeight: 700, color: '#115e59' },
+  rxMeta: { fontSize: 7, color: '#666', marginTop: 1 },
   rxInd: {
-    marginTop: 3,
-    fontSize: 8,
+    marginTop: 2,
+    fontSize: 7,
     color: '#888',
     borderLeftWidth: 2,
     borderLeftColor: TEAL,
-    paddingLeft: 6,
+    paddingLeft: 5,
   },
   rxQty: {
-    fontSize: 8,
+    fontSize: 7,
     backgroundColor: '#e0f2f1',
     color: '#00695c',
-    paddingVertical: 2,
-    paddingHorizontal: 7,
-    borderRadius: 10,
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: 8,
     fontWeight: 600,
   },
-  sigCaption: { fontSize: 8, color: '#737373', marginBottom: 4 },
+  /** Bloques 3–4: aspecto de documento clínico (más énfasis que 1–2). */
+  clinicalWrap: { marginBottom: 6 },
+  clinicalTab: {
+    alignSelf: 'stretch',
+    backgroundColor: '#0f766e',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  clinicalTabTxt: {
+    fontSize: 8,
+    fontWeight: 800,
+    color: '#fff',
+    letterSpacing: 0.35,
+  },
+  clinicalBox: {
+    borderWidth: 1,
+    borderColor: TEAL,
+    borderRadius: 3,
+    borderTopLeftRadius: 0,
+    overflow: 'hidden',
+  },
+  dxHeaderClinical: {
+    flexDirection: 'row',
+    backgroundColor: '#ccfbf1',
+    borderBottomWidth: 1,
+    borderBottomColor: TEAL,
+  },
+  dxThClinical: {
+    paddingVertical: 3,
+    paddingHorizontal: 5,
+    fontSize: 7,
+    fontWeight: 800,
+    color: '#134e4a',
+    borderRightWidth: 1,
+    borderRightColor: TEAL,
+  },
+  dxRowClinical: {
+    flexDirection: 'row',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#99f6e4',
+    backgroundColor: '#fafafa',
+  },
+  dxCellClinical: {
+    paddingVertical: 3,
+    paddingHorizontal: 5,
+    fontSize: 8,
+    borderRightWidth: 0.5,
+    borderRightColor: '#ccfbf1',
+  },
+  dxNameClinical: {
+    fontSize: 8.5,
+    fontWeight: 700,
+    color: '#0f172a',
+    lineHeight: 1.2,
+  },
+  rxBlockClinical: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#99f6e4',
+    flexDirection: 'column',
+    borderLeftWidth: 3,
+    borderLeftColor: TEAL,
+    backgroundColor: '#f0fdfa',
+  },
+  rxTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  rxTitleClinical: { flex: 1, fontSize: 9, fontWeight: 800, color: '#0f766e', lineHeight: 1.2 },
+  rxMetaClinical: { fontSize: 7, color: '#334155', marginTop: 1, lineHeight: 1.2 },
+  rxIndClinical: {
+    marginTop: 2,
+    fontSize: 7,
+    color: '#475569',
+    borderLeftWidth: 2,
+    borderLeftColor: TEAL,
+    paddingLeft: 5,
+    lineHeight: 1.2,
+  },
+  rxQtyClinical: {
+    fontSize: 7,
+    fontWeight: 800,
+    backgroundColor: TEAL,
+    color: '#fff',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 3,
+    alignSelf: 'flex-start',
+  },
+  sigCaption: { fontSize: 6.5, color: '#737373', marginBottom: 2 },
+  sigCol: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  sigRow: {
+    flexDirection: 'row',
+    paddingVertical: 5,
+    paddingHorizontal: 3,
+    alignItems: 'stretch',
+  },
+  sigDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: '#e0e0e0',
+  },
+  sigName: { fontSize: 6.5, color: '#666', marginTop: 2 },
+  sigPlaceholder: { fontSize: 7, color: '#aaa', fontStyle: 'italic' },
+  sigImg: { width: 148, height: 34, objectFit: 'contain' as const },
 });
 
 const DISCHARGE_LABEL: Record<string, string> = {
@@ -206,23 +299,36 @@ function fmtDateOnly(d: Date | string): string {
   return x.toLocaleDateString('es-PE', { dateStyle: 'short' });
 }
 
+function isRenderableImageDataUrl(s: string | undefined | null): boolean {
+  const t = s?.trim();
+  return Boolean(t && t.startsWith('data:image'));
+}
+
 type Props = {
   detail: Exclude<ConsultationDetail, null>;
+  /** Nombre del profesional que atiende (sin código). */
   professionalDisplayName: string;
-  /** Ruta absoluta a PNG (p. ej. `resolveSoPdfLogoPath()`). */
+  /** Firma o sello desde Mi firma (`worker_signatures`). */
+  professionalSignatureDataUrl?: string | null;
   logoSrc?: string;
 };
 
 export function ConsultationPdfDocument({
   detail,
   professionalDisplayName,
+  professionalSignatureDataUrl,
   logoSrc,
 }: Props) {
   const discharge =
     DISCHARGE_LABEL[detail.dischargeCondition] ?? detail.dischargeCondition;
 
-  const sig = detail.signatureData?.trim();
-  const hasSig = Boolean(sig && sig.startsWith('data:image'));
+  const patientSig = detail.signatureData?.trim();
+  const hasPatientSig = isRenderableImageDataUrl(patientSig);
+  const profSig = professionalSignatureDataUrl?.trim();
+  const hasProfSig = isRenderableImageDataUrl(profSig);
+
+  const referredNameOnly = (detail.referredByName ?? '').trim();
+  const attendedName = (professionalDisplayName ?? '').trim() || '—';
 
   return (
     <Document>
@@ -253,8 +359,8 @@ export function ConsultationPdfDocument({
           <Text style={styles.bannerTxt}>FICHA DE ATENCIÓN MÉDICA DE TÓPICO</Text>
         </View>
 
-        {/* 1. Paciente */}
-        <View style={styles.sectionWrap}>
+        {/* 1. Paciente — compacto */}
+        <View style={styles.sectionTight}>
           <View style={styles.tab}>
             <Text style={styles.tabTxt}>1. DATOS DEL PACIENTE</Text>
           </View>
@@ -262,30 +368,30 @@ export function ConsultationPdfDocument({
             <View style={styles.row}>
               <Text style={styles.cellLabel}>NOMBRE</Text>
               <Text style={styles.cellVal}>{detail.patientName}</Text>
-              <Text style={[styles.cellLabel, { width: '22%' }]}>CÓDIGO SAP</Text>
-              <Text style={[styles.cellVal, { flex: 0.6 }]}>{detail.patientCod}</Text>
+              <Text style={[styles.cellLabel, { width: '18%' }]}>CÓDIGO</Text>
+              <Text style={[styles.cellVal, { flex: 0.55 }]}>{detail.patientCod}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.cellLabel}>SEDE</Text>
               <Text style={styles.cellVal}>{detail.patientEstabl ?? '—'}</Text>
-              <Text style={[styles.cellLabel, { width: '22%' }]}>EDAD</Text>
-              <Text style={[styles.cellVal, { flex: 0.6 }]}>
+              <Text style={[styles.cellLabel, { width: '18%' }]}>EDAD</Text>
+              <Text style={[styles.cellVal, { flex: 0.55 }]}>
                 {detail.patientAge != null ? `${detail.patientAge} años` : '—'}
               </Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.cellLabel}>CARGO</Text>
               <Text style={styles.cellVal}>{detail.patientPosition ?? '—'}</Text>
-              <Text style={[styles.cellLabelTight, { width: '18%' }]}>N.º DOC.</Text>
-              <Text style={[styles.cellValTight, { flex: 0.55 }]}>
+              <Text style={[styles.cellLabel, { width: '18%' }]}>N.º DOC.</Text>
+              <Text style={[styles.cellVal, { flex: 0.55 }]}>
                 {detail.patientDocumentId ?? '—'}
               </Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.cellLabel}>DIVISIÓN</Text>
               <Text style={styles.cellVal}>{detail.patientDivision ?? '—'}</Text>
-              <Text style={[styles.cellLabel, { width: '22%' }]}>SUBDIVISIÓN</Text>
-              <Text style={[styles.cellVal, { flex: 0.6 }]}>
+              <Text style={[styles.cellLabel, { width: '18%' }]}>SUBDIVISIÓN</Text>
+              <Text style={[styles.cellVal, { flex: 0.55 }]}>
                 {detail.patientSubdivision ?? '—'}
               </Text>
             </View>
@@ -298,8 +404,8 @@ export function ConsultationPdfDocument({
           </View>
         </View>
 
-        {/* 2. Atención */}
-        <View style={styles.sectionWrap}>
+        {/* 2. Atención — compacto */}
+        <View style={styles.sectionTight}>
           <View style={styles.tab}>
             <Text style={styles.tabTxt}>2. DETALLES DE LA ATENCIÓN</Text>
           </View>
@@ -307,25 +413,21 @@ export function ConsultationPdfDocument({
             <View style={styles.row}>
               <Text style={styles.cellLabel}>ATENDIDO POR</Text>
               <Text style={[styles.cellValFull, { borderBottomWidth: 0.5 }]}>
-                {professionalDisplayName} (SAP {detail.createdBy})
+                {attendedName}
               </Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.cellLabel}>FECHA Y HORA</Text>
               <Text style={styles.cellVal}>{fmtDateTime(detail.attentionDate)}</Text>
-              <Text style={[styles.cellLabel, { width: '28%' }]}>CONDICIÓN AL ALTA</Text>
-              <View style={[styles.cellVal, { flex: 0.55, justifyContent: 'center' }]}>
+              <Text style={[styles.cellLabel, { width: '26%' }]}>CONDICIÓN AL ALTA</Text>
+              <View style={[styles.cellVal, { flex: 0.5, justifyContent: 'center' }]}>
                 <Text style={styles.badge}>{discharge}</Text>
               </View>
             </View>
-            {detail.referredByName || detail.referredByCod ? (
+            {referredNameOnly ? (
               <View style={styles.row}>
                 <Text style={styles.cellLabel}>DERIVADO / REFERIDO POR</Text>
-                <Text style={styles.cellValFull}>
-                  {[detail.referredByName, detail.referredByCod ? `(SAP ${detail.referredByCod})` : '']
-                    .filter(Boolean)
-                    .join(' ')}
-                </Text>
+                <Text style={styles.cellValFull}>{referredNameOnly}</Text>
               </View>
             ) : null}
             {detail.receiptNumber ? (
@@ -336,54 +438,64 @@ export function ConsultationPdfDocument({
             ) : null}
             <View style={styles.rowLast}>
               <Text style={[styles.cellLabel, { alignSelf: 'stretch' }]}>MOTIVO</Text>
-              <Text style={[styles.cellValFull, { minHeight: 36 }]}>{detail.reason ?? '—'}</Text>
+              <Text style={[styles.cellValFull, { minHeight: 16 }]}>{detail.reason ?? '—'}</Text>
             </View>
           </View>
         </View>
 
-        {/* 3. Diagnósticos */}
-        <View style={styles.sectionWrap}>
-          <View style={styles.tab}>
-            <Text style={styles.tabTxt}>3. DIAGNÓSTICOS PRESUNTIVOS</Text>
+        {/* 3. Diagnósticos — énfasis clínico */}
+        <View style={styles.clinicalWrap}>
+          <View style={styles.clinicalTab}>
+            <Text style={styles.clinicalTabTxt}>3. DIAGNÓSTICOS PRESUNTIVOS</Text>
           </View>
-          <View style={styles.box}>
-            <View style={styles.dxHeader}>
-              <Text style={[styles.dxTh, { width: '10%' }]}>#</Text>
-              <Text style={[styles.dxTh, { width: '22%' }]}>CIE-10</Text>
-              <Text style={[styles.dxTh, { flex: 1, borderRightWidth: 0 }]}>DIAGNÓSTICO</Text>
+          <View style={styles.clinicalBox}>
+            <View style={styles.dxHeaderClinical}>
+              <Text style={[styles.dxThClinical, { width: '10%' }]}>#</Text>
+              <Text style={[styles.dxThClinical, { width: '22%' }]}>CIE-10</Text>
+              <Text style={[styles.dxThClinical, { flex: 1, borderRightWidth: 0 }]}>
+                DIAGNÓSTICO
+              </Text>
             </View>
             {detail.diagnoses.length === 0 ? (
-              <Text style={{ padding: 8, fontSize: 9, color: '#666' }}>—</Text>
+              <Text style={{ padding: 6, fontSize: 8, color: '#64748b' }}>
+                Sin diagnósticos registrados.
+              </Text>
             ) : (
               detail.diagnoses.map((d, i) => (
                 <View
                   key={d.id}
                   style={[
-                    styles.dxRow,
+                    styles.dxRowClinical,
                     i === detail.diagnoses.length - 1 ? { borderBottomWidth: 0 } : {},
                   ]}
                 >
-                  <Text style={[styles.dxCell, { width: '10%', textAlign: 'center' }]}>
+                  <Text
+                    style={[styles.dxCellClinical, { width: '10%', textAlign: 'center' }]}
+                  >
                     {i + 1}
                   </Text>
-                  <Text style={[styles.dxCell, styles.dxCode, { width: '22%', fontSize: 9 }]}>
+                  <Text
+                    style={[styles.dxCellClinical, styles.dxCode, { width: '22%', fontSize: 8 }]}
+                  >
                     {d.code ?? '—'}
                   </Text>
-                  <Text style={[styles.dxCell, { flex: 1, borderRightWidth: 0 }]}>{d.name}</Text>
+                  <Text style={[styles.dxCellClinical, styles.dxNameClinical, { flex: 1, borderRightWidth: 0 }]}>
+                    {d.name}
+                  </Text>
                 </View>
               ))
             )}
           </View>
         </View>
 
-        {/* 4. Prescripción */}
-        <View style={styles.sectionWrap}>
-          <View style={styles.tab}>
-            <Text style={styles.tabTxt}>4. PRESCRIPCIÓN MÉDICA</Text>
+        {/* 4. Prescripción — énfasis clínico */}
+        <View style={styles.clinicalWrap}>
+          <View style={styles.clinicalTab}>
+            <Text style={styles.clinicalTabTxt}>4. PRESCRIPCIÓN MÉDICA</Text>
           </View>
-          <View style={styles.box}>
+          <View style={styles.clinicalBox}>
             {detail.prescriptions.length === 0 ? (
-              <Text style={{ padding: 8, fontSize: 9, color: '#666' }}>
+              <Text style={{ padding: 6, fontSize: 8, color: '#64748b' }}>
                 Sin medicación ni insumos registrados.
               </Text>
             ) : (
@@ -391,43 +503,57 @@ export function ConsultationPdfDocument({
                 <View
                   key={p.id}
                   style={[
-                    styles.rxBlock,
+                    styles.rxBlockClinical,
                     idx === detail.prescriptions.length - 1 ? { borderBottomWidth: 0 } : {},
                   ]}
                 >
-                  <View style={styles.rxLeft}>
-                    <Text style={styles.rxTitle}>{p.medicineName}</Text>
-                    <Text style={styles.rxMeta}>
-                      {[p.presentation, p.concentration, p.administrationRoute]
-                        .filter(Boolean)
-                        .join(' · ')}
-                      {p.frequency ? ` · ${p.frequency}` : ''}
-                      {p.duration ? ` · ${p.duration}` : ''}
-                    </Text>
-                    {p.instructions ? <Text style={styles.rxInd}>{p.instructions}</Text> : null}
+                  <View style={styles.rxTitleRow}>
+                    <Text style={styles.rxTitleClinical}>{p.medicineName}</Text>
+                    <Text style={styles.rxQtyClinical}>Cant: {p.quantity}</Text>
                   </View>
-                  <Text style={styles.rxQty}>Cant: {p.quantity}</Text>
+                  <Text style={styles.rxMetaClinical}>
+                    {[p.presentation, p.concentration, p.administrationRoute]
+                      .filter(Boolean)
+                      .join(' · ')}
+                    {p.frequency ? ` · ${p.frequency}` : ''}
+                    {p.duration ? ` · ${p.duration}` : ''}
+                  </Text>
+                  {p.instructions ? (
+                    <Text style={styles.rxIndClinical}>{p.instructions}</Text>
+                  ) : null}
                 </View>
               ))
             )}
           </View>
         </View>
 
-        {/* 5. Firma */}
+        {/* 5. Firmas paciente + profesional */}
         <View style={styles.sectionWrap}>
           <View style={styles.tab}>
-            <Text style={styles.tabTxt}>5. FIRMA DEL PACIENTE</Text>
+            <Text style={styles.tabTxt}>5. FIRMAS (PACIENTE Y PROFESIONAL)</Text>
           </View>
-          <View style={[styles.box, { padding: 12, alignItems: 'center' }]}>
-            {hasSig && sig ? (
-              <>
-                <Image src={sig} style={{ width: 180, height: 50, objectFit: 'contain' }} />
-                <Text style={{ fontSize: 8, color: '#888', marginTop: 4 }}>{detail.patientName}</Text>
-                <Text style={{ fontSize: 8, color: '#888' }}>Paciente</Text>
-              </>
-            ) : (
-              <Text style={{ fontSize: 9, color: '#888' }}>Sin firma registrada</Text>
-            )}
+          <View style={styles.box}>
+            <View style={styles.sigRow}>
+              <View style={styles.sigCol}>
+                <Text style={styles.sigCaption}>Firma del paciente</Text>
+                {hasPatientSig && patientSig ? (
+                  <Image src={patientSig} style={styles.sigImg} />
+                ) : (
+                  <Text style={styles.sigPlaceholder}>Sin firma del paciente</Text>
+                )}
+                <Text style={styles.sigName}>{detail.patientName}</Text>
+              </View>
+              <View style={styles.sigDivider} />
+              <View style={styles.sigCol}>
+                <Text style={styles.sigCaption}>Firma o sello del profesional</Text>
+                {hasProfSig && profSig ? (
+                  <Image src={profSig} style={styles.sigImg} />
+                ) : (
+                  <Text style={styles.sigPlaceholder}>Sin firma / sello registrado</Text>
+                )}
+                <Text style={styles.sigName}>{attendedName}</Text>
+              </View>
+            </View>
           </View>
         </View>
 

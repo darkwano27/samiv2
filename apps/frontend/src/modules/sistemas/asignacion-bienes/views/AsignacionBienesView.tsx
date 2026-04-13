@@ -170,6 +170,8 @@ function sapSearchEnabledForQ(q: string): boolean {
 
 const ACTA_PHOTO_MAX_EDGE = 1920;
 const ACTA_PHOTO_JPEG_QUALITY = 0.82;
+/** Mismo límite que `asignacion-bienes-acta.schema.ts` en el backend. */
+const ACTA_PHOTO_MAX_COUNT = 20;
 
 /** Cámara en móvil suele dejar `type` vacío o `application/octet-stream`; hay que intentar decodificar igual. */
 function blobMayBeImage(blob: Blob): boolean {
@@ -636,7 +638,16 @@ export function AsignacionBienesView() {
           file: f,
         })),
       );
-      setReportPhotos((prev) => [...prev, ...items]);
+      setReportPhotos((prev) => {
+        const room = Math.max(0, ACTA_PHOTO_MAX_COUNT - prev.length);
+        const next = items.slice(0, room);
+        if (next.length < items.length) {
+          window.alert(
+            `El acta admite como máximo ${ACTA_PHOTO_MAX_COUNT} fotos. Se agregaron ${next.length} y se omitieron el resto.`,
+          );
+        }
+        return [...prev, ...next];
+      });
     })();
   }
 
@@ -1390,7 +1401,9 @@ export function AsignacionBienesView() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base">5. Fotos de los equipos</CardTitle>
               <CardDescription>
-                Puedes tomar fotos con el celular o elegir archivos. Solo van en el PDF del acta.
+                Podés usar la cámara o elegir archivos; solo van en el PDF del acta. Máximo{' '}
+                {ACTA_PHOTO_MAX_COUNT} fotos. En el celular, si la pestaña se recarga al sacar la foto,
+                suele ser por memoria del navegador: probá una foto a la vez o cerrar otras apps.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 border-t border-border/60 pt-4">

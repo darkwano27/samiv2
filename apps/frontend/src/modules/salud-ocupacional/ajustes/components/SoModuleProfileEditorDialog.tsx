@@ -265,7 +265,7 @@ export function SoModuleProfileEditorDialog({ open, mode, profileId, onClose }: 
             <div className="space-y-4">
               {isSeed ? (
                 <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                  Este perfil viene con el sistema: podés cambiar el nombre y la descripción. Los
+                  Este perfil viene con el sistema: Puedes cambiar el nombre y la descripción. Los
                   permisos incluidos están definidos por la instalación.
                 </p>
               ) : (
@@ -303,21 +303,7 @@ export function SoModuleProfileEditorDialog({ open, mode, profileId, onClose }: 
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   disabled={busy}
                 />
-              </div>
-
-              {mode === 'create' ? (
-                <p className="text-xs text-muted-foreground">
-                  El identificador interno del perfil (slug) se genera solo a partir del nombre al
-                  guardar; no hace falta completarlo acá.
-                </p>
-              ) : detailQ.data ? (
-                <p className="text-xs text-muted-foreground">
-                  Slug URL:{' '}
-                  <code className="rounded bg-muted px-1 font-mono text-[13px]">
-                    {detailQ.data.slug || '—'}
-                  </code>
-                </p>
-              ) : null}
+              </div>            
 
               {!isSeed ? (
                 <div className="space-y-2">
@@ -403,7 +389,7 @@ export function SoModuleProfileEditorDialog({ open, mode, profileId, onClose }: 
           ) : (
             <span className="hidden text-xs text-muted-foreground sm:inline">
               {mode === 'edit' && detailQ.data?.member_count
-                ? 'No podés borrarlo: todavía hay personas con este perfil asignado.'
+                ? 'No puedes borrarlo: todavía hay personas con este perfil asignado.'
                 : ''}
             </span>
           )}

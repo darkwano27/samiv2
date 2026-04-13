@@ -1,12 +1,18 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { SAMI_DB } from '@core/database/database.module';
 import * as schema from '@core/database/schema';
-import { workers } from '@core/database/schema/workers';
 import { workforceSubdivisionRoleAssignees } from '@core/database/schema/workforce-subdivision-assignees';
+import { workers } from '@core/database/schema/workers';
+import { AdminService } from '@modules/rbac/services/admin.service';
 import type { PatchSubdivisionAssignmentsBody } from './dto/workforce-assignments.dto';
-import { ARIS_WORKFORCE_DIVISION_GROUPS } from './workforce-aris.constants';
+import {
+  ARIS_WORKFORCE_DIVISION_GROUPS,
+  MODULE_SLUG_HORAS_EXTRA,
+  WORKFORCE_PROFILE_APROBADOR_HE,
+  WORKFORCE_PROFILE_SUPERVISOR_HE,
+} from './workforce-aris.constants';
 import { WorkforceOrgCatalogService } from './workforce-org-catalog.service';
 
 const ALLOWED_WERKS: Set<string> = new Set(
@@ -26,6 +32,7 @@ export class WorkforceSubdivisionAssignmentsService {
   constructor(
     @Inject(SAMI_DB) private readonly db: PostgresJsDatabase<typeof schema>,
     private readonly catalog: WorkforceOrgCatalogService,
+    private readonly admin: AdminService,
   ) {}
 
   private async assertKnownSubdivision(divisionCode: string, subdivisionCode: string): Promise<void> {
@@ -51,22 +58,6 @@ export class WorkforceSubdivisionAssignmentsService {
     }
   }
 
-  private async assertWorkersExist(ids: string[]): Promise<void> {
-    const uniq = [...new Set(ids.map((x) => x.trim()).filter(Boolean))];
-    if (uniq.length === 0) return;
-    const rows = await this.db
-      .select({ id: workers.id })
-      .from(workers)
-      .where(inArray(workers.id, uniq));
-    const have = new Set(rows.map((r) => r.id));
-    const missing = uniq.filter((id) => !have.has(id));
-    if (missing.length) {
-      throw new BadRequestException({
-        message: `Hay códigos de persona sin registro en SAMI: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '…' : ''}. Agregalos primero desde el directorio o miembros del módulo.`,
-      });
-    }
-  }
-
   async listAll(): Promise<{ items: AssigneeRowDto[] }> {
     const rows = await this.db
       .select({
@@ -80,13 +71,18 @@ export class WorkforceSubdivisionAssignmentsService {
       .innerJoin(workers, eq(workforceSubdivisionRoleAssignees.workerId, workers.id));
 
     return {
-      items: rows.map((r) => ({
-        division_code: r.divisionCode,
-        subdivision_code: r.subdivisionCode,
-        role: r.role as 'supervisor' | 'approver',
-        worker_id: r.workerId,
-        worker_name: r.workerName,
-      })),
+      items: rows.map((r) => {
+        const raw = (r.role ?? '').trim();
+        const roleForApi: 'supervisor' | 'approver' =
+          raw === 'supervisor' ? 'supervisor' : 'approver';
+        return {
+          division_code: r.divisionCode,
+          subdivision_code: r.subdivisionCode,
+          role: roleForApi,
+          worker_id: r.workerId,
+          worker_name: r.workerName,
+        };
+      }),
     };
   }
 
@@ -97,7 +93,7 @@ export class WorkforceSubdivisionAssignmentsService {
 
     const sup = [...new Set(body.supervisor_worker_ids.map((x) => x.trim()).filter(Boolean))];
     const app = [...new Set(body.approver_worker_ids.map((x) => x.trim()).filter(Boolean))];
-    await this.assertWorkersExist([...sup, ...app]);
+    await this.admin.ensureWorkersForSapCodes([...sup, ...app]);
 
     await this.db.transaction(async (tx) => {
       await tx
@@ -124,12 +120,31 @@ export class WorkforceSubdivisionAssignmentsService {
           app.map((workerId) => ({
             divisionCode: division,
             subdivisionCode: subdivision,
-            role: 'approver',
+            /** Mismo valor que usa `AprobacionHorasExtraService` (`aprobador`), no el inglés `approver`. */
+            role: 'aprobador',
             workerId,
           })),
         );
       }
     });
+
+    const approverSet = new Set(app);
+    for (const workerSap of app) {
+      await this.admin.applyModuleProfile(
+        workerSap,
+        WORKFORCE_PROFILE_APROBADOR_HE,
+        MODULE_SLUG_HORAS_EXTRA,
+      );
+    }
+    for (const workerSap of sup) {
+      if (!approverSet.has(workerSap)) {
+        await this.admin.applyModuleProfile(
+          workerSap,
+          WORKFORCE_PROFILE_SUPERVISOR_HE,
+          MODULE_SLUG_HORAS_EXTRA,
+        );
+      }
+    }
 
     return { ok: true as const };
   }

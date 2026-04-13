@@ -12,7 +12,7 @@
 
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { canAccessApp } from '@/infrastructure/auth/permissions';
+import { canAccessApp, canAccessBoletasHorasExtraNav } from '@/infrastructure/auth/permissions';
 import type { MeResult } from '@/modules/auth/repository/auth.repository';
 import {
   CollapsedModuleFlyout,
@@ -41,8 +41,12 @@ type Props = {
 
 function moduleSlugForPath(pathname: string): string | null {
   if (pathname === '/dashboard') return null;
+  const p =
+    pathname === '/horas-extra/aprobacion-horas-extra'
+      ? '/horas-extra/registro-horas-extra'
+      : pathname;
   for (const m of MODULES) {
-    if (m.apps.some((a) => pathname === a.path)) return m.slug;
+    if (m.apps.some((a) => p === a.path)) return m.slug;
   }
   return null;
 }
@@ -78,13 +82,20 @@ export function Sidebar({
 }: Props) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const canAccess = useCallback(
-    (slug: string) => canAccessApp(session, slug),
+    (slug: string) =>
+      slug === 'registro-horas-extra'
+        ? canAccessBoletasHorasExtraNav(session)
+        : canAccessApp(session, slug),
     [session],
   );
   const modules = useMemo(() => getVisibleModules(canAccess), [canAccess]);
 
   const [expandedSlug, setExpandedSlug] = useState<string | null>(() => {
-    const list = getVisibleModules((s) => canAccessApp(session, s));
+    const list = getVisibleModules((s) =>
+      s === 'registro-horas-extra'
+        ? canAccessBoletasHorasExtraNav(session)
+        : canAccessApp(session, s),
+    );
     const fromPath = moduleSlugForPath(pathname);
     if (fromPath && list.some((m) => m.slug === fromPath)) return fromPath;
     const saved = readLs(LS_MODULE);

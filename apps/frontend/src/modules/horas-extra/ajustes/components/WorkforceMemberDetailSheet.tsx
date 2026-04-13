@@ -15,8 +15,25 @@ import {
   wfReplaceMemberProfile,
   wfRevokeAllInModule,
   wfRevokeAssignmentInModule,
+  type SoMemberAppAccess,
   type SoMemberDetail,
 } from '../repository/workforce-module-settings.api-repository';
+
+const HE_BOLETA_APP_SLUGS = new Set(['registro-horas-extra', 'aprobacion-horas-extra']);
+const HE_BOLETA_MERGED_LABEL = 'Boletas Horas Extra';
+
+function partitionHeBoletaApps(apps: SoMemberAppAccess[]): {
+  heApps: SoMemberAppAccess[];
+  otherApps: SoMemberAppAccess[];
+} {
+  const heApps: SoMemberAppAccess[] = [];
+  const otherApps: SoMemberAppAccess[] = [];
+  for (const a of apps) {
+    if (HE_BOLETA_APP_SLUGS.has(a.app_slug)) heApps.push(a);
+    else otherApps.push(a);
+  }
+  return { heApps, otherApps };
+}
 
 const ACTION_LABEL: Record<string, string> = {
   read: 'Lectura',
@@ -218,176 +235,247 @@ export function WorkforceMemberDetailSheet({ open, workerId, onClose }: Props) {
               No se pudo cargar el detalle. Cierra e intenta de nuevo.
             </p>
           ) : d ? (
-            <div className="space-y-6">
-              <div className="flex gap-3">
-                <div
-                  className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary"
-                  aria-hidden
-                >
-                  {initialsFromName(d.display_name, d.worker_id)}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-foreground">{d.display_name}</p>
-                  <p className="text-xs text-muted-foreground">Código {d.worker_id}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Asignado el {formatDate(d.assigned_at)}
-                  </p>
-                  {d.applied_profile?.label ? (
-                    <p className="mt-1 text-xs font-medium text-foreground">
-                      Perfil: {d.applied_profile.label}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-
-              <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Puede usar — {d.apps_with_access.length}
-                </h3>
-                <ul className="mt-2 space-y-3">
-                  {d.apps_with_access.map((app) => (
-                    <li
-                      key={app.assignment_id}
-                      className="rounded-lg border border-border/80 bg-muted/20 p-3.5"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium text-foreground">{app.app_label}</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 shrink-0 text-destructive hover:text-destructive"
-                          disabled={busy}
-                          onClick={() => revokeOneM.mutate(app.assignment_id)}
-                        >
-                          Quitar
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Rol técnico en la app: {app.role_label}
-                      </p>
-                      {app.profile_product_actions?.length ? (
-                        <div className="mt-2 space-y-1">
-                          <p className="text-xs text-muted-foreground">
-                            Acciones según el perfil aplicado:
-                          </p>
-                          <p className="inline-flex flex-wrap gap-1.5">
-                            {app.profile_product_actions.map((a) => (
-                              <span
-                                key={a}
-                                className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-900 dark:text-emerald-100"
-                              >
-                                {ACTION_LABEL[a] ?? a}
-                              </span>
-                            ))}
-                          </p>
-                        </div>
-                      ) : (
-                        <ul className="mt-2 space-y-1.5">
-                          {app.features.map((f) => (
-                            <li key={f.feature_slug} className="text-xs">
-                              <span className="text-muted-foreground">Permisos:</span>{' '}
-                              <span className="inline-flex flex-wrap gap-1">
-                                {(f.actions ?? []).map((a) => (
-                                  <span
-                                    key={a}
-                                    className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-900 dark:text-emerald-100"
-                                  >
-                                    {ACTION_LABEL[a] ?? a}
-                                  </span>
-                                ))}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  No puede usar (aún) — {d.apps_without_access.length}
-                </h3>
-                <ul className="mt-2 space-y-2.5">
-                  {d.apps_without_access.map((a) => (
-                    <li
-                      key={a.app_slug}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed border-border/80 px-3 py-2.5 text-sm"
-                    >
-                      <span className="text-muted-foreground">{a.app_label}</span>
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-xs font-medium',
-                          a.reason === 'solo_admin'
-                            ? 'bg-muted text-muted-foreground'
-                            : 'bg-muted/80 text-muted-foreground',
-                        )}
-                      >
-                        {a.reason === 'solo_admin' ? 'Solo administración' : 'Sin acceso'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              {formError ? (
-                <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                  {formError}
-                </p>
-              ) : null}
-
-              <section className="space-y-2 border-t border-border pt-4">
-                <h3 className="text-sm font-medium">Cambiar perfil</h3>
-                <p className="text-xs text-muted-foreground">
-                  Selecciona una plantilla (Supervisor, Aprobador, Admin WorkForce). Al aplicar, se
-                  reemplazan los accesos actuales del módulo.
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <select
-                    className="flex min-h-11 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring sm:max-w-[240px]"
-                    value={profileSlug}
-                    disabled={busy || !profilesQ.data?.profiles?.length || profilesQ.isLoading}
-                    onChange={(e) => setProfileSlug(e.target.value)}
-                  >
-                    {(profilesQ.data?.profiles ?? []).map((o) => (
-                      <option key={o.id} value={o.slug}>
-                        {o.label}
-                        {o.is_seed ? ' — sistema' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    type="button"
-                    className="min-h-11 bg-primary"
-                    disabled={
-                      busy ||
-                      !profileSlug ||
-                      profilesQ.isLoading ||
-                      !profilesQ.data?.profiles?.length
-                    }
-                    onClick={() => confirmReplace()}
-                  >
-                    {replaceM.isPending ? 'Aplicando…' : 'Aplicar'}
-                  </Button>
-                </div>
-              </section>
-
-              <div className="border-t border-border pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
-                  disabled={busy}
-                  onClick={() => confirmRevoke()}
-                >
-                  {revokeAllM.isPending ? 'Revocando…' : 'Revocar acceso completo al módulo'}
-                </Button>
-              </div>
-            </div>
+            <MemberDetailBody
+              d={d}
+              busy={busy}
+              formError={formError}
+              profileSlug={profileSlug}
+              setProfileSlug={setProfileSlug}
+              profilesQ={profilesQ}
+              replaceM={replaceM}
+              revokeAllM={revokeAllM}
+              revokeOneM={revokeOneM}
+              confirmReplace={confirmReplace}
+              confirmRevoke={confirmRevoke}
+            />
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function renderAppPermissionsBlock(app: SoMemberAppAccess) {
+  if (app.profile_product_actions?.length) {
+    return (
+      <div className="mt-2 space-y-1">
+        <p className="text-xs text-muted-foreground">Acciones según el perfil aplicado:</p>
+        <p className="inline-flex flex-wrap gap-1.5">
+          {app.profile_product_actions.map((a) => (
+            <span
+              key={a}
+              className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-900 dark:text-emerald-100"
+            >
+              {ACTION_LABEL[a] ?? a}
+            </span>
+          ))}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {app.features.map((f) => (
+        <li key={f.feature_slug} className="text-xs">
+          <span className="text-muted-foreground">Permisos:</span>{' '}
+          <span className="inline-flex flex-wrap gap-1">
+            {(f.actions ?? []).map((a) => (
+              <span
+                key={a}
+                className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-900 dark:text-emerald-100"
+              >
+                {ACTION_LABEL[a] ?? a}
+              </span>
+            ))}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function MemberDetailBody({
+  d,
+  busy,
+  formError,
+  profileSlug,
+  setProfileSlug,
+  profilesQ,
+  replaceM,
+  revokeAllM,
+  revokeOneM,
+  confirmReplace,
+  confirmRevoke,
+}: {
+  d: SoMemberDetail;
+  busy: boolean;
+  formError: string | null;
+  profileSlug: string;
+  setProfileSlug: (v: string) => void;
+  profilesQ: {
+    data?: { profiles: { id: string; slug: string; label: string; is_seed?: boolean }[] };
+    isLoading: boolean;
+  };
+  replaceM: { isPending: boolean };
+  revokeAllM: { isPending: boolean };
+  revokeOneM: { mutate: (id: string) => void };
+  confirmReplace: () => void;
+  confirmRevoke: () => void;
+}) {
+  const { heApps, otherApps } = partitionHeBoletaApps(d.apps_with_access);
+  const hasHeBoleta = heApps.length > 0;
+  const appsWithoutAccess = d.apps_without_access.filter(
+    (a) => !(hasHeBoleta && HE_BOLETA_APP_SLUGS.has(a.app_slug)),
+  );
+  const puedeUsarCount = otherApps.length + (hasHeBoleta ? 1 : 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex gap-3">
+        <div
+          className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary"
+          aria-hidden
+        >
+          {initialsFromName(d.display_name, d.worker_id)}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate font-medium text-foreground">{d.display_name}</p>
+          <p className="text-xs text-muted-foreground">Código {d.worker_id}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Asignado el {formatDate(d.assigned_at)}</p>
+          {d.applied_profile?.label ? (
+            <p className="mt-1 text-xs font-medium text-foreground">Perfil: {d.applied_profile.label}</p>
+          ) : null}
+        </div>
+      </div>
+
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Puede usar — {puedeUsarCount}
+        </h3>
+        <ul className="mt-2 space-y-3">
+          {hasHeBoleta ? (
+            <li className="rounded-lg border border-border/80 bg-muted/20 p-3.5">
+              <p className="font-medium text-foreground">{HE_BOLETA_MERGED_LABEL}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Una sola entrada en el menú; los roles técnicos abajo definen registro y/o aprobación.
+              </p>
+              <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
+                {heApps.map((app) => (
+                  <div key={app.assignment_id} className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-xs font-medium text-foreground">{app.role_label}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 shrink-0 text-destructive hover:text-destructive"
+                        disabled={busy}
+                        onClick={() => revokeOneM.mutate(app.assignment_id)}
+                      >
+                        Quitar
+                      </Button>
+                    </div>
+                    {renderAppPermissionsBlock(app)}
+                  </div>
+                ))}
+              </div>
+            </li>
+          ) : null}
+          {otherApps.map((app) => (
+            <li key={app.assignment_id} className="rounded-lg border border-border/80 bg-muted/20 p-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-medium text-foreground">{app.app_label}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 shrink-0 text-destructive hover:text-destructive"
+                  disabled={busy}
+                  onClick={() => revokeOneM.mutate(app.assignment_id)}
+                >
+                  Quitar
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Rol técnico en la app: {app.role_label}</p>
+              {renderAppPermissionsBlock(app)}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          No puede usar (aún) — {appsWithoutAccess.length}
+        </h3>
+        <ul className="mt-2 space-y-2.5">
+          {appsWithoutAccess.map((a) => (
+            <li
+              key={a.app_slug}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed border-border/80 px-3 py-2.5 text-sm"
+            >
+              <span className="text-muted-foreground">{a.app_label}</span>
+              <span
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                  a.reason === 'solo_admin'
+                    ? 'bg-muted text-muted-foreground'
+                    : 'bg-muted/80 text-muted-foreground',
+                )}
+              >
+                {a.reason === 'solo_admin' ? 'Solo administración' : 'Sin acceso'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {formError ? (
+        <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {formError}
+        </p>
+      ) : null}
+
+      <section className="space-y-2 border-t border-border pt-4">
+        <h3 className="text-sm font-medium">Cambiar perfil</h3>
+        <p className="text-xs text-muted-foreground">
+          Selecciona una plantilla (Supervisor, Aprobador, Admin WorkForce). Al aplicar, se reemplazan
+          los accesos actuales del módulo.
+        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <select
+            className="flex min-h-11 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring sm:max-w-[240px]"
+            value={profileSlug}
+            disabled={busy || !profilesQ.data?.profiles?.length || profilesQ.isLoading}
+            onChange={(e) => setProfileSlug(e.target.value)}
+          >
+            {(profilesQ.data?.profiles ?? []).map((o) => (
+              <option key={o.id} value={o.slug}>
+                {o.label}
+                {o.is_seed ? ' — sistema' : ''}
+              </option>
+            ))}
+          </select>
+          <Button
+            type="button"
+            className="min-h-11 bg-primary"
+            disabled={busy || !profileSlug || profilesQ.isLoading || !profilesQ.data?.profiles?.length}
+            onClick={() => confirmReplace()}
+          >
+            {replaceM.isPending ? 'Aplicando…' : 'Aplicar'}
+          </Button>
+        </div>
+      </section>
+
+      <div className="border-t border-border pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
+          disabled={busy}
+          onClick={() => confirmRevoke()}
+        >
+          {revokeAllM.isPending ? 'Revocando…' : 'Revocar acceso completo al módulo'}
+        </Button>
       </div>
     </div>
   );

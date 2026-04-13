@@ -122,10 +122,17 @@
   * {
     @apply border-border outline-ring/50;
     }
-  body {
-    @apply bg-background text-foreground;
-    }
+  /**
+   * Una sola columna de scroll en rutas autenticadas: el shell usa `overflow-y-auto` en el `<Outlet />`.
+   * Sin esto, `html`/`body` también crecen y aparecen dos barras verticales (p. ej. Asignación de bienes).
+   */
   html {
-    @apply font-sans;
+    @apply h-full overflow-hidden font-sans;
+    }
+  body {
+    @apply h-full overflow-hidden bg-background text-foreground;
+    }
+  #root {
+    @apply h-full min-h-0 overflow-hidden;
     }
 }

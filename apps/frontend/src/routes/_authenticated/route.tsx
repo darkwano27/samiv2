@@ -39,7 +39,7 @@ function AuthenticatedLayout() {
   const { isCollapsed, toggle } = useSidebarCollapsedPersistence();
 
   return (
-    <div className="flex h-dvh max-h-dvh overflow-hidden bg-background text-foreground">
+    <div className="flex min-h-0 flex-1 overflow-hidden bg-background text-foreground">
       <Sidebar
         session={session}
         isCollapsed={isCollapsed}
@@ -52,7 +52,7 @@ function AuthenticatedLayout() {
           session={session}
           onMobileMenuOpen={() => setMobileOpen(true)}
         />
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           <Outlet />
         </div>
       </div>

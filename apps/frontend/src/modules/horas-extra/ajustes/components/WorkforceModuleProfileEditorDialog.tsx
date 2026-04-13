@@ -316,8 +316,14 @@ export function WorkforceModuleProfileEditorDialog({ open, mode, profileId, onCl
               {!isSeed ? (
                 <div className="space-y-2">
                   <Label>Acciones por aplicación</Label>
+                  <p className="text-xs text-muted-foreground">
+                    La aprobación de boletas se asigna con los perfiles semilla «Aprobador» o «Admin WorkForce»
+                    (rol técnico en catálogo RBAC, no se lista aparte acá).
+                  </p>
                   <div className="max-h-64 space-y-3 overflow-y-auto rounded-md border border-border p-3 sm:max-h-80">
-                    {(catalogQ.data?.apps ?? []).map((app) => {
+                    {(catalogQ.data?.apps ?? [])
+                      .filter((app) => app.slug !== 'aprobacion-horas-extra')
+                      .map((app) => {
                       if (app.is_management) {
                         return (
                           <div

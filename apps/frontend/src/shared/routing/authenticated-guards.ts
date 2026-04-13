@@ -1,9 +1,20 @@
 import { redirect } from '@tanstack/react-router';
-import { canAccessApp, canRead } from '@/infrastructure/auth/permissions';
+import {
+  canAccessApp,
+  canAccessBoletasHorasExtraNav,
+  canRead,
+} from '@/infrastructure/auth/permissions';
 import type { MeResult } from '@/modules/auth/repository/auth.repository';
 
 export function assertAppAccess(session: MeResult, appSlug: string): void {
   if (!canAccessApp(session, appSlug)) {
+    throw redirect({ to: '/dashboard' });
+  }
+}
+
+/** WorkForce: una sola pantalla para supervisores y/o aprobadores. */
+export function assertBoletasHorasExtraAccess(session: MeResult): void {
+  if (!canAccessBoletasHorasExtraNav(session)) {
     throw redirect({ to: '/dashboard' });
   }
 }

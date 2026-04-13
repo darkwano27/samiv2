@@ -64,7 +64,9 @@ export type CreateConsultationPayload = {
   dischargeCondition: SoDischargeCondition;
   receiptNumber?: string;
   emailTo?: string;
-  emailCc?: string[];
+  /** Correo del responsable (jefatura); dispara segundo correo sin PDF, CC al paciente. */
+  supervisorEmail?: string;
+  supervisorName?: string;
   signatureData?: string;
   diagnosisIds: string[];
   prescriptions: {

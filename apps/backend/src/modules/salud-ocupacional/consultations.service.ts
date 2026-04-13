@@ -13,6 +13,7 @@ import { RbacService } from '@modules/rbac/services/rbac.service';
 import type { CachedPermissions } from '@modules/rbac/types/rbac-cache.types';
 import { createElement } from 'react';
 import { getSoPdfLogoImageSrc, resolveSoPdfLogoPath } from '@core/pdf/pdf-assets';
+import { UserSignatureService } from '@modules/auth/services/user-signature.service';
 import { ConsultationsRepository } from './consultations.repository';
 import { ConsultationPdfDocument } from './pdf/ConsultationPdfDocument';
 import type {
@@ -45,6 +46,37 @@ function formatAttentionForEmail(d: Date | string): string {
   return `${dateStr} — ${timeStr}`;
 }
 
+const SO_EMAIL_SUBJECT = 'ATENCION MEDICA DE TOPICO';
+
+function soDischargeLabelEs(condition: string): string {
+  const m: Record<string, string> = {
+    observacion: 'En observación',
+    recuperado: 'Recuperado',
+    derivado: 'Derivado al hospital',
+  };
+  return m[condition] ?? condition;
+}
+
+function buildSoTopicNotificationBody(parts: {
+  patientName: string;
+  reason: string;
+  attentionLabel: string;
+  dischargeLabel: string;
+  preamble?: string;
+}): string {
+  const lines: string[] = [];
+  if (parts.preamble) {
+    lines.push(parts.preamble, '');
+  }
+  lines.push(
+    `Nombre del Paciente: ${parts.patientName}`,
+    `Motivo: ${parts.reason}`,
+    `Fecha y hora: ${parts.attentionLabel}`,
+    `Condición al alta: ${parts.dischargeLabel}`,
+  );
+  return lines.join('\n');
+}
+
 @Injectable()
 export class ConsultationsService {
   private readonly logger = new Logger(ConsultationsService.name);
@@ -54,6 +86,7 @@ export class ConsultationsService {
     private readonly rbac: RbacService,
     private readonly pdf: PdfService,
     private readonly moduleSmtp: ModuleSmtpService,
+    private readonly userSignatures: UserSignatureService,
   ) {}
 
   sapSearch(q: string) {
@@ -167,86 +200,154 @@ export class ConsultationsService {
       snapshots,
       sapSnapshot,
     );
-    void this.sendConsultationPdfEmail(out.id, body, workerDisplayName);
+    void this.sendConsultationNotificationEmails(
+      out.id,
+      body,
+      workerDisplayName,
+    );
     return { id: out.id, correlative: out.correlative, success: true as const };
   }
 
   /**
-   * Genera PDF de la consulta y lo envía por SMTP del módulo SO (`module_smtp_settings`).
+   * 1) Correo solo al paciente con PDF (diagnóstico y ficha completa).
+   * 2) Si hay jefatura: correo al responsable, copia al paciente, sin PDF (mismo asunto y cuerpo estructurado).
    * No bloquea la respuesta HTTP; fallos solo se registran en log.
    */
-  private async sendConsultationPdfEmail(
+  private async sendConsultationNotificationEmails(
     consultationId: string,
     body: CreateConsultationBody,
     professionalDisplayName: string,
   ): Promise<void> {
-    const to = body.emailTo?.trim() || body.patientEmail?.trim();
-    if (!to) {
-      this.logger.log(
-        `Sin emailTo ni patientEmail; no se envía PDF de consulta ${consultationId}`,
-      );
-      return;
-    }
+    const patientTo = body.emailTo?.trim() || body.patientEmail?.trim();
+    const supervisorTo = body.supervisorEmail?.trim();
 
     const detail = await this.repo.getConsultationDetail(consultationId);
     if (!detail) {
       this.logger.warn(
-        `Consulta ${consultationId} no encontrada al generar PDF para correo`,
+        `Consulta ${consultationId} no encontrada al generar correos de notificación`,
       );
       return;
     }
 
+    const patientName = detail.patientName.trim();
+    const attentionLabel = formatAttentionForEmail(detail.attentionDate);
+    const reasonText = (detail.reason ?? '').trim() || '—';
+    const dischargeLabel = soDischargeLabelEs(detail.dischargeCondition);
+
+    const structuredPatient = buildSoTopicNotificationBody({
+      patientName,
+      reason: reasonText,
+      attentionLabel,
+      dischargeLabel,
+      preamble:
+        'Adjuntamos la ficha de atención médica de tópico en PDF (diagnóstico y detalle de la consulta).',
+    });
+
+    const structuredSupervisor = buildSoTopicNotificationBody({
+      patientName,
+      reason: reasonText,
+      attentionLabel,
+      dischargeLabel,
+      preamble: patientTo
+        ? 'Notificación de atención médica de tópico. No se adjunta PDF; el paciente recibe el comprobante completo por correo directo.'
+        : 'Notificación de atención médica de tópico. No se adjunta PDF (no hay correo del paciente para envío de ficha).',
+    });
+
+    let professionalSignatureDataUrl: string | undefined;
+    let professionalDisplayNameForPdf = professionalDisplayName.trim();
     try {
-      const logoPath = resolveSoPdfLogoPath();
-      const logoSrc = getSoPdfLogoImageSrc();
-      if (!logoSrc && logoPath) {
-        this.logger.warn(
-          `Logo SO presente en disco pero no se pudo cargar para el PDF: ${logoPath}`,
+      const prof = await this.userSignatures.getSignatureForPdf(
+        detail.createdBy,
+      );
+      professionalSignatureDataUrl = prof.effective_data_url ?? undefined;
+      const wn = (prof.display_name ?? '').trim();
+      if (wn) {
+        professionalDisplayNameForPdf = wn;
+      }
+    } catch {
+      professionalSignatureDataUrl = undefined;
+    }
+    if (this.repo.hasSap()) {
+      try {
+        const sapW = await this.repo.getSapWorkerByPernr(detail.createdBy.trim());
+        const sapName = (sapW?.name ?? '').trim();
+        if (sapName && sapName !== '—') {
+          professionalDisplayNameForPdf = sapName;
+        }
+      } catch {
+        /* SAP no disponible */
+      }
+    }
+
+    if (patientTo) {
+      try {
+        const logoPath = resolveSoPdfLogoPath();
+        const logoSrc = getSoPdfLogoImageSrc();
+        if (!logoSrc && logoPath) {
+          this.logger.warn(
+            `Logo SO presente en disco pero no se pudo cargar para el PDF: ${logoPath}`,
+          );
+        }
+        const buffer = await this.pdf.renderToBuffer(
+          createElement(ConsultationPdfDocument, {
+            detail,
+            professionalDisplayName: professionalDisplayNameForPdf,
+            professionalSignatureDataUrl,
+            logoSrc,
+          }) as PdfDocumentElement,
+        );
+        const codSafe = detail.patientCod.trim().replace(/[^\w.-]+/g, '_');
+        const filename = `${codSafe}_CONSULTA_SO_${detail.correlative}.pdf`;
+
+        await this.moduleSmtp.sendMailForModule(SO_MODULE_SLUG, {
+          to: patientTo,
+          subject: SO_EMAIL_SUBJECT,
+          text: structuredPatient,
+          attachments: [
+            { filename, content: buffer, contentType: 'application/pdf' },
+          ],
+        });
+        this.logger.log(
+          `PDF de consulta ${consultationId} enviado solo al paciente: ${patientTo}`,
+        );
+      } catch (e) {
+        this.logger.error(
+          `No se pudo enviar PDF al paciente (${consultationId}): ${e instanceof Error ? e.message : String(e)}`,
         );
       }
-      const buffer = await this.pdf.renderToBuffer(
-        createElement(ConsultationPdfDocument, {
-          detail,
-          professionalDisplayName,
-          logoSrc,
-        }) as PdfDocumentElement,
-      );
-      const codSafe = detail.patientCod.trim().replace(/[^\w.-]+/g, '_');
-      const filename = `${codSafe}_CONSULTA_SO_${detail.correlative}.pdf`;
-      const patient = detail.patientName.trim();
-      const attentionLabel = formatAttentionForEmail(detail.attentionDate);
-      const reasonText = (detail.reason ?? '').trim() || '—';
-
-      await this.moduleSmtp.sendMailForModule(SO_MODULE_SLUG, {
-        to,
-        cc: body.emailCc?.length ? body.emailCc : undefined,
-        subject: 'ATENCION MEDICA DE TOPICO',
-        text: [
-          `Estimado/a ${patient},`,
-          '',
-          'Adjuntamos su ficha de atención médica de tópico generada desde SAMI.',
-          '',
-          `Motivo de atención: ${reasonText}`,
-          `Fecha y hora: ${attentionLabel}`,
-          `Nº de atención: ${detail.correlative}`,
-          '',
-          'Por favor, conserve este documento como respaldo de su atención.',
-          '',
-          'Saludos cordiales,',
-          'Servicio de Salud Ocupacional — ARIS',
-        ].join('\n'),
-        attachments: [
-          { filename, content: buffer, contentType: 'application/pdf' },
-        ],
-      });
-
+    } else {
       this.logger.log(
-        `PDF de consulta ${consultationId} enviado por correo a ${to}`,
+        `Sin correo del paciente; no se genera ni envía PDF (${consultationId})`,
       );
-    } catch (e) {
-      this.logger.error(
-        `No se pudo enviar PDF de consulta ${consultationId}: ${e instanceof Error ? e.message : String(e)}`,
-      );
+    }
+
+    if (supervisorTo) {
+      if (supervisorTo.toLowerCase() === patientTo?.toLowerCase()) {
+        this.logger.warn(
+          `Correo de jefatura igual al del paciente; se omite notificación a jefatura (${consultationId})`,
+        );
+        return;
+      }
+      const ccPatient =
+        patientTo && patientTo.toLowerCase() !== supervisorTo.toLowerCase()
+          ? patientTo
+          : undefined;
+      try {
+        await this.moduleSmtp.sendMailForModule(SO_MODULE_SLUG, {
+          to: supervisorTo,
+          cc: ccPatient,
+          subject: SO_EMAIL_SUBJECT,
+          text: structuredSupervisor,
+        });
+        this.logger.log(
+          `Notificación sin PDF de consulta ${consultationId} a jefatura ${supervisorTo}` +
+            (ccPatient ? ` (CC paciente ${ccPatient})` : ''),
+        );
+      } catch (e) {
+        this.logger.error(
+          `No se pudo enviar correo a jefatura (${consultationId}): ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
     }
   }
 

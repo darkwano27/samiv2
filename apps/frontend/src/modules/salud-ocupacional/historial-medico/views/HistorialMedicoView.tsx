@@ -207,7 +207,7 @@ export function HistorialMedicoView() {
         <CardContent className="space-y-4 pt-6">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2 sm:col-span-2 lg:col-span-1">
-              <Label htmlFor="so-hist-search">Buscar (nombre o SAP)</Label>
+              <Label htmlFor="so-hist-search">Buscar (nombre o código)</Label>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -294,7 +294,7 @@ export function HistorialMedicoView() {
               <th className="px-3 py-2 font-medium">Nº</th>
               <th className="px-3 py-2 font-medium">Fecha atención</th>
               <th className="px-3 py-2 font-medium">Paciente</th>
-              <th className="px-3 py-2 font-medium">SAP</th>
+              <th className="px-3 py-2 font-medium">Código</th>
               <th className="px-3 py-2 font-medium">División</th>
               <th className="px-3 py-2 font-medium">Cargo</th>
               <th className="px-3 py-2 font-medium">Condición</th>

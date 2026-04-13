@@ -89,7 +89,9 @@ export const createConsultationBodySchema = z.object({
   dischargeCondition: z.enum(DISCHARGE_CONDITIONS),
   receiptNumber: z.string().max(50).optional(),
   emailTo: z.string().email().optional(),
-  emailCc: z.array(z.string().email()).optional(),
+  /** Correo del responsable / jefatura (opcional). Dispara segundo correo sin PDF, con copia al paciente. */
+  supervisorEmail: z.string().email().optional(),
+  supervisorName: z.string().max(200).optional(),
   signatureData: z.string().optional(),
   diagnosisIds: z.array(z.string().uuid()).min(1),
   prescriptions: z.array(prescriptionItemSchema).optional().default([]),

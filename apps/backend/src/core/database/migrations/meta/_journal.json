@@ -148,6 +148,34 @@
       "when": 1776300000000,
       "tag": "0020_workforce_boleta_export_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1776400000000,
+      "tag": "0021_he_boletas",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1776500000000,
+      "tag": "0022_he_boleta_motivo_nullable",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1776600000000,
+      "tag": "0023_he_boleta_display_number",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1776700000000,
+      "tag": "0024_he_boleta_approved_audit",
+      "breakpoints": true
     }
   ]
 }

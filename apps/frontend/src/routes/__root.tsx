@@ -8,9 +8,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootLayout() {
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <Outlet />
       {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
-    </>
+    </div>
   );
 }

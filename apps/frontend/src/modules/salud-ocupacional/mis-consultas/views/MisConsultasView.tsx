@@ -58,7 +58,7 @@ export function MisConsultasView() {
       <div>
         <h1 className="font-heading text-2xl font-semibold tracking-tight">Mis consultas</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Atenciones en las que figurás como paciente (SAP{' '}
+          Atenciones en las que figurás como paciente (código{' '}
           <span className="font-mono text-foreground">{session.sapCode}</span>), registradas por
           enfermería en Registro de consulta. No incluye consultas de otras personas. Por defecto se
           filtra el mes en curso.
@@ -106,7 +106,7 @@ export function MisConsultasView() {
               <th className="px-3 py-2 font-medium">Nº</th>
               <th className="px-3 py-2 font-medium">Fecha atención</th>
               <th className="px-3 py-2 font-medium">Paciente</th>
-              <th className="px-3 py-2 font-medium">SAP</th>
+              <th className="px-3 py-2 font-medium">Código</th>
               <th className="px-3 py-2 font-medium">Motivo</th>
               <th className="px-3 py-2 font-medium">Condición</th>
             </tr>

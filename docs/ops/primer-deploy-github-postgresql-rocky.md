@@ -158,6 +158,7 @@ pnpm --filter @sami/backend build
 pnpm --filter @sami/backend db:migrate
 pnpm --filter @sami/backend run seed
 pnpm --filter @sami/backend run seed:rbac
+pnpm --filter @sami/backend run seed:so-catalog
 
 pnpm --filter @sami/frontend build
 
@@ -178,7 +179,7 @@ Nginx + certificados + `ecosystem.config.cjs`: seguí las secciones 8–10 de [`
 |--------|----------------|
 | `git push` crea tablas en PostgreSQL | **No** |
 | `pnpm db:migrate` crea/actualiza tablas | **Sí**, dentro de una BD ya existente |
-| `seed` / `seed:rbac` cargan datos iniciales | **Sí**, si los ejecutás vos |
+| `seed` / `seed:rbac` / `seed:so-catalog` cargan datos iniciales | **Sí**, si los ejecutás vos (`seed:so-catalog` = diagnósticos y medicamentos SO) |
 | Instalar PostgreSQL en el servidor | **No** — lo hacés en la sección B |
 
 ---
@@ -193,6 +194,7 @@ git pull origin main
 pnpm install --frozen-lockfile
 pnpm --filter @sami/backend build
 pnpm --filter @sami/backend db:migrate
+pnpm --filter @sami/backend run seed:so-catalog
 pnpm --filter @sami/frontend build
 rm -rf /var/www/sami/* && cp -r apps/frontend/dist/* /var/www/sami/
 pm2 restart sami-backend

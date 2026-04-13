@@ -549,7 +549,9 @@ export class ConsultationsRepository {
           dischargeCondition: body.dischargeCondition,
           receiptNumber: body.receiptNumber?.trim() || null,
           emailTo: body.emailTo?.trim() || null,
-          emailCc: body.emailCc ?? null,
+          emailCc: body.supervisorEmail?.trim()
+            ? [body.supervisorEmail.trim()]
+            : null,
           signatureData: body.signatureData?.trim() || null,
           createdBy: createdBy.trim(),
         })

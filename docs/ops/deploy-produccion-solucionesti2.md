@@ -325,6 +325,7 @@ pnpm --filter @sami/backend build
 pnpm --filter @sami/backend db:migrate
 pnpm --filter @sami/backend run seed
 pnpm --filter @sami/backend run seed:rbac
+pnpm --filter @sami/backend run seed:so-catalog
 
 pnpm --filter @sami/frontend build
 
@@ -378,7 +379,7 @@ pm2 restart sami-backend
 - [ ] `apps/backend/.env` completo y `SESSION_SECRET` ≥ 32
 - [ ] `SETTINGS_ENCRYPTION_KEY` definida si usarán credenciales en UI
 - [ ] Redis y PostgreSQL accesibles desde el servidor
-- [ ] `db:migrate` + `seed` + `seed:rbac` ejecutados al menos una vez
+- [ ] `db:migrate` + `seed` + `seed:rbac` + `seed:so-catalog` ejecutados al menos una vez
 - [ ] PM2 online y `pm2 startup` configurado
 - [ ] `https://solucionesti2.aris.com.pe/api/health` OK
 - [ ] PWA: HTTPS confiable en los navegadores de los usuarios

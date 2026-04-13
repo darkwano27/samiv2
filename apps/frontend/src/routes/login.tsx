@@ -24,22 +24,22 @@ export const Route = createFileRoute('/login')({
 
 function LoginPage() {
   return (
-    <div className="relative min-h-dvh md:bg-background">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain md:min-h-0 md:bg-background">
       {/*
         Móvil: capa z-0 (evita z negativo detrás del fondo blanco del padre).
         Desktop: panel izquierdo usa la misma imagen en aside.
       */}
       <LoginHeroBackdrop className="absolute inset-0 z-0 md:hidden" />
 
-      <div className="relative z-10 min-h-dvh md:grid md:grid-cols-[minmax(0,11fr)_minmax(0,9fr)] md:grid-rows-1 md:bg-background">
-        <aside className="relative z-0 hidden min-h-dvh min-w-0 md:block">
+      <div className="relative z-10 min-h-dvh flex-1 md:grid md:min-h-0 md:grid-cols-[minmax(0,11fr)_minmax(0,9fr)] md:grid-rows-1 md:bg-background">
+        <aside className="relative z-0 hidden min-h-dvh min-w-0 md:block md:min-h-0">
           <LoginHeroBackdrop className="absolute inset-0" />
-          <div className="relative z-10 flex min-h-dvh items-center justify-center px-8 lg:px-12">
+          <div className="relative z-10 flex min-h-dvh items-center justify-center px-8 lg:px-12 md:min-h-0 md:h-full">
             <LoginMarketingBlock variant="desktop-panel" />
           </div>
         </aside>
 
-        <main className="flex min-h-dvh min-w-0 flex-col bg-transparent md:bg-background">
+        <main className="flex min-h-dvh min-w-0 flex-1 flex-col bg-transparent md:min-h-0 md:bg-background">
           <div className="flex min-h-0 flex-1 flex-col justify-center px-4 py-8 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] md:px-10 md:py-10 lg:px-14">
             <div className="mx-auto w-full max-w-md md:max-w-lg">
               <div className="mb-8 md:hidden">

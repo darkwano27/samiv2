@@ -7,6 +7,8 @@ type Props = {
   correlative: number;
   /** Correo del formulario (si hubo). */
   patientEmail: string;
+  /** Si se notificó jefatura (segundo correo, sin PDF, con copia al paciente). */
+  supervisorEmail?: string;
   onClose: () => void;
   onNewConsultation: () => void;
   onGoHistorial: () => void;
@@ -16,6 +18,7 @@ export function ConsultationSavedModal({
   open,
   correlative,
   patientEmail,
+  supervisorEmail,
   onClose,
   onNewConsultation,
   onGoHistorial,
@@ -49,12 +52,28 @@ export function ConsultationSavedModal({
           <p className="mt-3 text-sm text-muted-foreground">
             {patientEmail ? (
               <>
-                Enviaremos el comprobante en PDF a{' '}
-                <span className="break-all font-medium text-foreground">{patientEmail}</span> en
-                cuanto esté listo.
+                Enviaremos el PDF de la consulta solo a{' '}
+                <span className="break-all font-medium text-foreground">{patientEmail}</span>.
+                {supervisorEmail ? (
+                  <>
+                    {' '}
+                    Además, un correo sin adjunto irá a la jefatura (
+                    <span className="break-all font-medium text-foreground">
+                      {supervisorEmail}
+                    </span>
+                    ) con copia a ese mismo correo del paciente.
+                  </>
+                ) : null}
+              </>
+            ) : supervisorEmail ? (
+              <>
+                No hay correo del paciente: no se enviará el PDF. Se notificará igual a la
+                jefatura (
+                <span className="break-all font-medium text-foreground">{supervisorEmail}</span>
+                ), sin copia al paciente.
               </>
             ) : (
-              'No indicaste un correo: el comprobante no se enviará automáticamente. Puedes cargar el correo del paciente antes de guardar en la próxima consulta.'
+              'No indicaste correo del paciente ni jefatura: no se enviará notificación por correo.'
             )}
           </p>
         </div>

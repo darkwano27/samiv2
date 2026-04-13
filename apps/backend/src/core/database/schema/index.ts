@@ -8,4 +8,5 @@ export * from './module-glpi-settings';
 export * from './module-sharepoint-settings';
 export * from './workforce-subdivision-assignees';
 export * from './workforce-boleta-export-settings';
+export * from './he-boletas';
 export * from './salud-ocupacional';

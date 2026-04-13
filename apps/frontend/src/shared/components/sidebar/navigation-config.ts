@@ -56,17 +56,10 @@ export const MODULES: NavModule[] = [
     apps: [
       {
         slug: 'registro-horas-extra',
-        label: 'Registro de Horas Extra',
+        label: 'Boletas Horas Extra',
         path: '/horas-extra/registro-horas-extra',
-        description: 'Registra las horas extra trabajadas',
+        description: 'Bandeja, registro y aprobación según tu rol y subdivisiones',
         icon: 'FileClock',
-      },
-      {
-        slug: 'aprobacion-horas-extra',
-        label: 'Aprobación de Horas Extra',
-        path: '/horas-extra/aprobacion-horas-extra',
-        description: 'Bandeja y aprobación de boletas',
-        icon: 'ClipboardCheck',
       },
       {
         slug: 'horas-extra-ajustes',

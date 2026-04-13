@@ -297,7 +297,7 @@ export function SoEmailSettingsTab({ variant = 'salud-ocupacional' }: Props) {
       : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Card>
         <CardHeader className="space-y-3 pb-2">
           <button
@@ -352,7 +352,7 @@ export function SoEmailSettingsTab({ variant = 'salud-ocupacional' }: Props) {
         </CardHeader>
         <CardContent
           id={`${idp}-smtp-panel`}
-          className={cn('space-y-4', !smtpPanelOpen && 'hidden')}
+          className={cn('space-y-3', !smtpPanelOpen && 'hidden')}
         >
           <CardDescription className="text-xs leading-relaxed">
             {isAdmin
@@ -527,12 +527,7 @@ export function SoEmailSettingsTab({ variant = 'salud-ocupacional' }: Props) {
                       />
                       Quitar contraseña guardada
                     </label>
-                  ) : null}
-                  <p className="text-xs text-muted-foreground">
-                    En el servidor se guarda cifrado (AES-256-GCM); no se devuelve el valor. Equivalente
-                    API: <code className="font-mono">smtp_pass_configured</code> (si hay contraseña
-                    guardada).
-                  </p>
+                  ) : null}              
                 </div>
 
                 <div className="space-y-2">
@@ -548,15 +543,7 @@ export function SoEmailSettingsTab({ variant = 'salud-ocupacional' }: Props) {
                     className="min-h-11"
                   />
                 </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                El servidor de aplicación debe definir la variable{' '}
-                <code className="rounded bg-muted px-1 font-mono text-[11px]">
-                  SETTINGS_ENCRYPTION_KEY
-                </code>{' '}
-                para poder guardar credenciales.
-              </p>
+              </div>       
 
               <div className="flex flex-wrap gap-2">
                 <Button

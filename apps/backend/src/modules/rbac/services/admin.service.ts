@@ -1081,10 +1081,18 @@ export class AdminService {
             applied_profile_label = p.label;
           }
         }
+        const slugSet = new Set(assignments.map((a) => a.app_slug));
+        let app_count = slugSet.size;
+        if (
+          slugSet.has('registro-horas-extra') &&
+          slugSet.has('aprobacion-horas-extra')
+        ) {
+          app_count -= 1;
+        }
         return {
           worker_id,
           display_name: rawName,
-          app_count: new Set(assignments.map((a) => a.app_slug)).size,
+          app_count,
           assignments: assignments.map((a) => ({
             app_slug: a.app_slug,
             role_slug: a.role_slug,
@@ -1988,6 +1996,17 @@ export class AdminService {
       return existing.id;
     }
     return this.ensureWorkerStubFromSap(sapCode);
+  }
+
+  /**
+   * Garantiza una fila en `workers` por cada código SAP: ya existente en SAMI o alta/actualización desde
+   * staging (activo). Usado p. ej. al guardar supervisores/aprobadores por subdivisión en WorkForce.
+   */
+  async ensureWorkersForSapCodes(sapCodes: string[]): Promise<void> {
+    const uniq = [...new Set(sapCodes.map((x) => x.trim()).filter(Boolean))];
+    for (const id of uniq) {
+      await this.resolveWorkerIdForRbacAssignment(id);
+    }
   }
 
   /**

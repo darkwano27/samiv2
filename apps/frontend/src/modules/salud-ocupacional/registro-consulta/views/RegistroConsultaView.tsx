@@ -11,8 +11,8 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -27,7 +27,6 @@ import { SignaturePadModal } from '../components/SignaturePadModal';
 import { useSoDiagnoses } from '../hooks/use-so-diagnoses';
 import { useSoSapSearch } from '../hooks/use-so-sap-search';
 import { useSoCreateConsultation } from '../hooks/use-so-registro-mutations';
-import { fetchMeSignature } from '@/modules/auth/repository/user-signature.api-repository';
 import { readApiMessage } from '../repository/so-consultations.api-repository';
 import type {
   SoDischargeCondition,
@@ -70,15 +69,21 @@ const selectClass =
   'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50';
 
 const textareaClass =
-  'flex min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50';
+  'flex min-h-[88px] w-full rounded-md border border-input bg-transparent px-3 py-1.5 text-sm leading-snug shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-[120px] sm:py-2';
+
+/** Espaciado vertical entre bloques dentro de cada card (apretado en móvil). */
+const soCardBody = 'space-y-2 pt-2 sm:space-y-3 sm:pt-3';
+
+/** Borde de contenedores: token global `--border` (mismo patrón en todas las secciones). */
+const soSectionCardClass = 'border border-border shadow-sm';
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-xs font-semibold uppercase tracking-wide text-primary">{children}</p>
+    <p className="text-xs font-semibold uppercase tracking-wide leading-tight text-primary">
+      {children}
+    </p>
   );
 }
-
-type CcRecipient = { email: string; name: string };
 
 export function RegistroConsultaView() {
   const navigate = useNavigate();
@@ -90,8 +95,10 @@ export function RegistroConsultaView() {
   const [referrerQuery, setReferrerQuery] = useState('');
   const [selectedReferrer, setSelectedReferrer] = useState<SoSapWorker | null>(null);
 
-  const [ccQuery, setCcQuery] = useState('');
-  const [ccRecipients, setCcRecipients] = useState<CcRecipient[]>([]);
+  const [supervisorQuery, setSupervisorQuery] = useState('');
+  const [selectedSupervisor, setSelectedSupervisor] = useState<SoSapWorker | null>(
+    null,
+  );
 
   const [patientEmail, setPatientEmail] = useState('');
 
@@ -110,34 +117,20 @@ export function RegistroConsultaView() {
   const [prescriptions, setPrescriptions] = useState<SoPrescriptionDraft[]>([]);
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [sigModalOpen, setSigModalOpen] = useState(false);
-  const profileSignaturePrimed = useRef(false);
 
   const [formError, setFormError] = useState<string | null>(null);
   const [savedModal, setSavedModal] = useState<{
     id: string;
     email: string;
     correlative: number;
+    supervisorEmail?: string;
   } | null>(null);
 
   const sapPatientQ = useSoSapSearch(patientQuery);
   const sapReferrerQ = useSoSapSearch(referrerQuery);
-  const sapCcQ = useSoSapSearch(ccQuery);
+  const sapSupervisorQ = useSoSapSearch(supervisorQuery);
   const dxQ = useSoDiagnoses();
   const createConsultation = useSoCreateConsultation();
-
-  const meSigQ = useQuery({
-    queryKey: ['auth', 'me-signature'],
-    queryFn: fetchMeSignature,
-    staleTime: 300_000,
-  });
-
-  useEffect(() => {
-    if (profileSignaturePrimed.current) return;
-    if (!meSigQ.isSuccess) return;
-    profileSignaturePrimed.current = true;
-    const url = meSigQ.data.effective_data_url;
-    if (url) setSignatureData(url);
-  }, [meSigQ.isSuccess, meSigQ.data?.effective_data_url]);
 
   const diagnoses = dxQ.data ?? [];
 
@@ -165,20 +158,9 @@ export function RegistroConsultaView() {
     setReferrerQuery('');
   }
 
-  function addCcFromWorker(w: SoSapWorker) {
-    const email = ccWorkerEmail(w);
-    if (!email) return;
-    setCcRecipients((prev) => {
-      if (prev.some((r) => r.email.toLowerCase() === email.toLowerCase())) {
-        return prev;
-      }
-      return [...prev, { email, name: w.name }];
-    });
-    setCcQuery('');
-  }
-
-  function removeCc(email: string) {
-    setCcRecipients((prev) => prev.filter((r) => r.email !== email));
+  function selectSupervisor(w: SoSapWorker) {
+    setSelectedSupervisor(w);
+    setSupervisorQuery('');
   }
 
   function addDiagnosis(id: string) {
@@ -232,8 +214,8 @@ export function RegistroConsultaView() {
     setPatientQuery('');
     setReferrerQuery('');
     setSelectedReferrer(null);
-    setCcQuery('');
-    setCcRecipients([]);
+    setSupervisorQuery('');
+    setSelectedSupervisor(null);
     setPatientEmail('');
     setDiagnosisIds([]);
     setAttentionLocal(defaultLocalDatetime());
@@ -264,9 +246,25 @@ export function RegistroConsultaView() {
       return;
     }
 
+    if (selectedSupervisor) {
+      const supEm =
+        ccWorkerEmail(selectedSupervisor) ||
+        primaryWorkerEmail(selectedSupervisor);
+      if (!supEm?.trim()) {
+        setFormError(
+          'La persona de jefatura elegida no tiene correo en SAP. Elegí otra o quitá la selección.',
+        );
+        return;
+      }
+    }
+
     const emailTo = patientEmail.trim() || undefined;
-    const emailCc =
-      ccRecipients.length > 0 ? ccRecipients.map((r) => r.email) : undefined;
+    const supervisorEmailRaw = selectedSupervisor
+      ? ccWorkerEmail(selectedSupervisor) ||
+        primaryWorkerEmail(selectedSupervisor)
+      : undefined;
+    const supervisorEmail = supervisorEmailRaw?.trim() || undefined;
+    const supervisorName = selectedSupervisor?.name;
 
     const savedEmailSnap =
       patientEmail.trim() || primaryWorkerEmail(selectedPatient);
@@ -286,7 +284,8 @@ export function RegistroConsultaView() {
       dischargeCondition: discharge,
       receiptNumber: receiptNumber.trim() || undefined,
       emailTo,
-      emailCc,
+      supervisorEmail,
+      supervisorName,
       signatureData: signatureData ?? undefined,
       diagnosisIds,
       prescriptions: prescriptions.map((p) => ({
@@ -304,6 +303,7 @@ export function RegistroConsultaView() {
           id: res.id,
           email: savedEmailSnap,
           correlative: res.correlative,
+          supervisorEmail: supervisorEmail || undefined,
         });
         resetFormFields();
       },
@@ -316,13 +316,13 @@ export function RegistroConsultaView() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-4 pb-24">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 p-3 pb-16 sm:gap-4 sm:p-4 sm:pb-24">
+      <div className="leading-tight">
+        <h1 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
           Registro de consulta
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Salud ocupacional — completá los bloques en orden y guardá al final.
+        <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">
+          Salud ocupacional — completá los bloques y guardá al final.
         </p>
       </div>
 
@@ -332,12 +332,12 @@ export function RegistroConsultaView() {
         </p>
       ) : null}
 
-      {/* —— Buscador SAP (Paciente) —— */}
-      <section className="space-y-3">
-        <SectionTitle>Buscador SAP (Paciente)</SectionTitle>
-        <Card className="border-primary/20 ring-1 ring-primary/10">
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
+      {/* —— Buscador por código (paciente) —— */}
+      <section className="space-y-1.5 sm:space-y-2">
+        <SectionTitle>Buscador por código (paciente)</SectionTitle>
+        <Card size="sm" className={soSectionCardClass}>
+          <CardContent className={soCardBody}>
+            <div className="space-y-1 sm:space-y-1.5">
               <Label htmlFor="so-patient-search">Paciente</Label>
               <div className="relative">
                 <Search
@@ -346,7 +346,7 @@ export function RegistroConsultaView() {
                 />
                 <Input
                   id="so-patient-search"
-                  className="border-primary/35 pl-9 focus-visible:border-primary"
+                  className="pl-9"
                   value={patientQuery}
                   onChange={(e) => setPatientQuery(e.target.value)}
                   placeholder="Código, nombre, documento, división…"
@@ -355,11 +355,11 @@ export function RegistroConsultaView() {
               </div>
             </div>
             {sapPatientQ.isFetching ? (
-              <p className="text-xs text-muted-foreground">Buscando en SAP…</p>
+              <p className="text-xs text-muted-foreground">Buscando…</p>
             ) : null}
             {sapPatientQ.isError ? (
               <p className="text-sm text-destructive">
-                No se pudo consultar SAP. Reintentá más tarde.
+                No se pudo completar la búsqueda. Reintentá más tarde.
               </p>
             ) : null}
             {patientQuery.trim().length >= 1 &&
@@ -373,10 +373,10 @@ export function RegistroConsultaView() {
                   <li key={w.cod}>
                     <button
                       type="button"
-                      className="flex w-full items-center gap-3 px-3 py-3 text-left text-sm transition-colors hover:bg-muted/50"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/50 sm:gap-2.5 sm:py-2.5"
                       onClick={() => selectPatient(w)}
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground sm:h-10 sm:w-10 sm:text-sm">
                         {initialsFromName(w.name)}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -402,9 +402,9 @@ export function RegistroConsultaView() {
             ) : null}
 
             {selectedPatient ? (
-              <div className="rounded-xl border border-primary/25 bg-background p-4 shadow-sm">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-base font-semibold text-primary">
+              <div className="rounded-xl border border-border bg-background p-3 shadow-sm sm:p-4">
+                <div className="flex items-start gap-2.5 sm:gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary sm:h-12 sm:w-12 sm:text-base">
                     {initialsFromName(selectedPatient.name)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -431,7 +431,7 @@ export function RegistroConsultaView() {
                     <X className="h-5 w-5" />
                   </button>
                 </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <div className="mt-3 grid gap-1.5 sm:mt-4 sm:grid-cols-2 sm:gap-2">
                   <Tile icon={Hash} label="Código" value={selectedPatient.cod} />
                   <Tile
                     icon={Building2}
@@ -472,14 +472,17 @@ export function RegistroConsultaView() {
       </section>
 
       {/* —— Registro de Atención —— */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <ClipboardList className="h-5 w-5 text-primary" aria-hidden />
+      <section className="space-y-1.5 sm:space-y-2">
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <ClipboardList
+            className="h-4 w-4 shrink-0 text-primary sm:h-5 sm:w-5"
+            aria-hidden
+          />
           <SectionTitle>Registro de Atención</SectionTitle>
         </div>
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
+        <Card size="sm" className={soSectionCardClass}>
+          <CardContent className={soCardBody}>
+            <div className="space-y-1 sm:space-y-1.5">
               <Label htmlFor="so-attention">Fecha de atención</Label>
               <Input
                 id="so-attention"
@@ -488,7 +491,7 @@ export function RegistroConsultaView() {
                 onChange={(e) => setAttentionLocal(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1 sm:space-y-1.5">
               <Label htmlFor="so-reason">Motivo de atención *</Label>
               <textarea
                 id="so-reason"
@@ -496,10 +499,10 @@ export function RegistroConsultaView() {
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Describí los síntomas o motivo de la visita…"
-                rows={5}
+                rows={4}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1 sm:space-y-1.5">
               <Label htmlFor="so-referrer-search">Derivado por</Label>
               <div className="relative">
                 <Search
@@ -511,7 +514,7 @@ export function RegistroConsultaView() {
                   className="pl-9"
                   value={referrerQuery}
                   onChange={(e) => setReferrerQuery(e.target.value)}
-                  placeholder="Buscar en SAP por apellido o código…"
+                  placeholder="Buscar por apellido o código…"
                   autoComplete="off"
                 />
               </div>
@@ -547,8 +550,8 @@ export function RegistroConsultaView() {
                 </p>
               ) : null}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="so-receipt">N° boleta generada (SAP)</Label>
+            <div className="space-y-1 sm:space-y-1.5">
+              <Label htmlFor="so-receipt">N° boleta generada</Label>
               <Input
                 id="so-receipt"
                 value={receiptNumber}
@@ -557,7 +560,7 @@ export function RegistroConsultaView() {
                 autoComplete="off"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1 sm:space-y-1.5">
               <Label htmlFor="so-discharge">Condición al alta *</Label>
               <select
                 id="so-discharge"
@@ -580,11 +583,11 @@ export function RegistroConsultaView() {
       </section>
 
       {/* —— Diagnóstico —— */}
-      <section className="space-y-3">
+      <section className="space-y-1.5 sm:space-y-2">
         <SectionTitle>Diagnóstico</SectionTitle>
-        <Card className="overflow-visible">
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
+        <Card size="sm" className={cn(soSectionCardClass, 'overflow-visible')}>
+          <CardContent className={soCardBody}>
+            <div className="space-y-1 sm:space-y-1.5">
               <Label htmlFor="so-dx-search">Buscar diagnóstico</Label>
               <div className="flex flex-row items-stretch gap-2 sm:items-center">
                 <div className="relative z-30 min-w-0 flex-1">
@@ -646,15 +649,15 @@ export function RegistroConsultaView() {
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-10 w-10 shrink-0 border-primary/50 text-primary"
+                  className="h-10 w-10 shrink-0 border-border text-primary"
                   title="Agregar diagnóstico al catálogo"
                   onClick={() => setDxDialogOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Escribí para filtrar y tocá un resultado para agregarlo.
+              <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                Filtrá con el texto y tocá un resultado para agregarlo.
               </p>
             </div>
             {diagnosisIds.length > 0 ? (
@@ -681,8 +684,8 @@ export function RegistroConsultaView() {
                 })}
               </ul>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Aún no agregaste diagnósticos.
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                Sin diagnósticos aún.
               </p>
             )}
           </CardContent>
@@ -690,15 +693,20 @@ export function RegistroConsultaView() {
       </section>
 
       {/* —— Receta médica —— */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Pill className="h-5 w-5 text-primary" aria-hidden />
+      <section className="space-y-1.5 sm:space-y-2">
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <Pill
+            className="h-4 w-4 shrink-0 text-primary sm:h-5 sm:w-5"
+            aria-hidden
+          />
           <SectionTitle>Receta médica (Fármacos)</SectionTitle>
         </div>
-        <Card>
-          <CardContent className="space-y-4 pt-6">
+        <Card size="sm" className={soSectionCardClass}>
+          <CardContent className={soCardBody}>
             {prescriptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Ningún fármaco recetado.</p>
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                Sin fármacos en la receta.
+              </p>
             ) : (
               <div className="overflow-x-auto rounded-md border border-border">
                 <table className="w-full min-w-[520px] text-left text-sm">
@@ -754,10 +762,10 @@ export function RegistroConsultaView() {
               type="button"
               onClick={() => setRxModalOpen(true)}
               className={cn(
-                'flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary/40 py-4 text-sm font-medium text-primary transition-colors hover:bg-primary/5',
+                'flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-2.5 text-sm font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/5 sm:py-3.5',
               )}
             >
-              <Plus className="h-5 w-5" />
+              <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
               Agregar fármaco
             </button>
           </CardContent>
@@ -765,14 +773,17 @@ export function RegistroConsultaView() {
       </section>
 
       {/* —— Remitir a correos —— */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Mail className="h-5 w-5 text-primary" aria-hidden />
+      <section className="space-y-1.5 sm:space-y-2">
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <Mail
+            className="h-4 w-4 shrink-0 text-primary sm:h-5 sm:w-5"
+            aria-hidden
+          />
           <SectionTitle>Remitir a correos</SectionTitle>
         </div>
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
+        <Card size="sm" className={soSectionCardClass}>
+          <CardContent className={soCardBody}>
+            <div className="space-y-1 sm:space-y-1.5">
               <Label htmlFor="so-patient-email">Correo del paciente</Label>
               <div className="relative">
                 <Mail
@@ -789,63 +800,67 @@ export function RegistroConsultaView() {
                   autoComplete="off"
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Por defecto: correo corporativo si existe; si no, el personal (cuenta local).
+              <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                Por defecto: corporativo si existe; si no, personal (cuenta local).
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="so-cc-search">Buscar en SAP (agregar copia)</Label>
+            <div className="space-y-1 sm:space-y-1.5">
+              <Label htmlFor="so-supervisor-search">Jefatura</Label>
               <div className="relative">
                 <Search
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
                   aria-hidden
                 />
                 <Input
-                  id="so-cc-search"
+                  id="so-supervisor-search"
                   className="pl-9"
-                  value={ccQuery}
-                  onChange={(e) => setCcQuery(e.target.value)}
-                  placeholder="Apellidos o código para copia…"
+                  value={supervisorQuery}
+                  onChange={(e) => setSupervisorQuery(e.target.value)}
+                  placeholder="Apellidos o código del responsable…"
                   autoComplete="off"
                 />
               </div>
-              {ccQuery.trim().length >= 1 && sapCcQ.data && sapCcQ.data.length > 0 ? (
+              <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                Opcional. Si eliges jefatura, el sistema envía el PDF solo al paciente y un
+                segundo correo al responsable (sin PDF), con copia al paciente.
+              </p>
+              {supervisorQuery.trim().length >= 1 &&
+              sapSupervisorQ.data &&
+              sapSupervisorQ.data.length > 0 ? (
                 <ul className="max-h-36 overflow-y-auto rounded-md border border-border">
-                  {sapCcQ.data.map((w) => (
+                  {sapSupervisorQ.data.map((w) => (
                     <li key={w.cod}>
                       <button
                         type="button"
                         className="w-full px-3 py-2 text-left text-sm hover:bg-muted/60"
-                        onClick={() => addCcFromWorker(w)}
+                        onClick={() => selectSupervisor(w)}
                       >
                         {w.name}{' '}
                         <span className="text-muted-foreground">
-                          ({ccWorkerEmail(w) ?? 'sin correo'})
+                          ({ccWorkerEmail(w) ?? primaryWorkerEmail(w) ?? 'sin correo'})
                         </span>
                       </button>
                     </li>
                   ))}
                 </ul>
               ) : null}
-              {ccRecipients.length > 0 ? (
-                <ul className="flex flex-wrap gap-2">
-                  {ccRecipients.map((r) => (
-                    <li
-                      key={r.email}
-                      className="inline-flex items-center gap-1 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-sm text-sky-900 dark:text-sky-100"
-                    >
-                      <span className="max-w-[200px] truncate">{r.email}</span>
-                      <button
-                        type="button"
-                        className="rounded-full p-0.5 hover:bg-sky-500/20"
-                        aria-label={`Quitar ${r.email}`}
-                        onClick={() => removeCc(r.email)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+              {selectedSupervisor ? (
+                <p className="text-sm text-muted-foreground">
+                  Jefatura:{' '}
+                  <strong className="text-foreground">{selectedSupervisor.name}</strong>{' '}
+                  (
+                  {ccWorkerEmail(selectedSupervisor) ??
+                    primaryWorkerEmail(selectedSupervisor) ??
+                    'sin correo'}
+                  )
+                  <button
+                    type="button"
+                    className="ml-2 text-primary underline"
+                    onClick={() => setSelectedSupervisor(null)}
+                  >
+                    Quitar
+                  </button>
+                </p>
               ) : null}
             </div>
           </CardContent>
@@ -853,34 +868,34 @@ export function RegistroConsultaView() {
       </section>
 
       {/* —— Firma digital —— */}
-      <section className="space-y-3">
+      <section className="space-y-1.5 sm:space-y-2">
         <SectionTitle>Firma digital</SectionTitle>
-        <Card>
-          <CardContent className="pt-6">
+        <Card size="sm" className={soSectionCardClass}>
+          <CardContent className="pt-2 sm:pt-4">
             <button
               type="button"
               onClick={() => setSigModalOpen(true)}
-              className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-muted-foreground/35 py-10 text-center transition-colors hover:border-primary/40 hover:bg-muted/20"
+              className="flex w-full flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border py-4 text-center transition-colors hover:border-primary/40 hover:bg-muted/20 sm:gap-1.5 sm:py-6"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-500/15 text-sky-600">
-                <PenLine className="h-6 w-6" aria-hidden />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-500/15 text-sky-600 sm:h-11 sm:w-11">
+                <PenLine className="h-5 w-5" aria-hidden />
               </div>
-              <span className="font-medium text-sky-800 dark:text-sky-200">
-                {signatureData ? 'Firma capturada — tocar para cambiar' : 'Agregar firma digital'}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Tocá para abrir el panel de firmas
+              <span className="px-2 text-sm font-medium text-sky-800 dark:text-sky-200">
+                {signatureData
+                  ? 'Firma lista. Tocá para cambiar.'
+                  : 'Sin firma. Tocá para abrir el panel de firmas.'}
               </span>
             </button>
           </CardContent>
         </Card>
       </section>
 
-      <Card>
-        <CardFooter className="flex justify-end gap-3 border-t py-4">
+      <Card size="sm" className={soSectionCardClass}>
+        <CardFooter className="flex flex-col gap-1.5 border-t py-2.5 sm:flex-row sm:justify-end sm:gap-2 sm:py-3">
           <Button
             type="button"
             variant="outline"
+            className="w-full sm:w-auto"
             onClick={() => {
               resetFormFields();
               setSavedModal(null);
@@ -890,7 +905,7 @@ export function RegistroConsultaView() {
           </Button>
           <Button
             type="button"
-            className="gap-2 bg-primary"
+            className="w-full gap-2 bg-primary sm:w-auto"
             disabled={!canSubmit}
             onClick={() => void submit()}
           >
@@ -933,6 +948,7 @@ export function RegistroConsultaView() {
         open={savedModal != null}
         correlative={savedModal?.correlative ?? 0}
         patientEmail={savedModal?.email ?? ''}
+        supervisorEmail={savedModal?.supervisorEmail}
         onClose={() => setSavedModal(null)}
         onNewConsultation={() => {
           setSavedModal(null);
@@ -957,8 +973,8 @@ function Tile({
   value: string;
 }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-border/80 bg-muted/20 px-3 py-2">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+    <div className="flex items-start gap-1.5 rounded-lg border border-border/80 bg-muted/20 px-2.5 py-1 sm:gap-2 sm:px-3 sm:py-1.5">
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4" aria-hidden />
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}

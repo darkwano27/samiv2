@@ -227,19 +227,7 @@ export function WorkforceRolesAjustesTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="border-primary/20 bg-muted/20 shadow-none">
-        <CardHeader className="space-y-1 pb-2 pt-3">
-          <CardTitle className="text-sm font-medium">Dos ideas distintas (no se mezclan)</CardTitle>
-          <CardDescription className="text-xs leading-relaxed sm:text-sm">
-            <strong>Organización:</strong> en cada subdivisión definís quién es <strong>supervisor</strong> y quién{' '}
-            <strong>aprobador</strong> de boletas para esa área (SAP por subdivisión).{' '}
-            <strong>Roles (esta pestaña):</strong> perfiles del módulo — Admin WorkForce, Supervisor y Aprobador a
-            nivel <em>aplicación</em> (quién puede entrar a Bandeja, Registro, Ajustes, etc.). Los perfiles aparecen
-            en <strong>Perfiles (roles)</strong> abajo; si la lista está vacía, ejecutá en el servidor{' '}
-            <code className="rounded bg-muted px-1 font-mono text-[11px]">pnpm seed:rbac</code> (backend).
-          </CardDescription>
-        </CardHeader>
-      </Card>
+     
 
       <div
         className="flex min-h-[48px] w-full max-w-xl flex-wrap gap-1 rounded-lg border border-border/80 bg-muted/30 p-1"
@@ -303,10 +291,6 @@ export function WorkforceRolesAjustesTab() {
           <Card className="overflow-visible">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Agregar persona</CardTitle>
-              <CardDescription>
-                Aplicá una plantilla (Supervisor, Aprobador o Admin WorkForce). Los permisos no se
-                duplican si ya existían.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 overflow-visible">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-4">
@@ -548,11 +532,7 @@ export function WorkforceRolesAjustesTab() {
               <h2 className="flex items-center gap-2 font-heading text-base font-semibold">
                 <Settings2 className="h-4 w-4 text-primary" aria-hidden />
                 Perfiles del módulo
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Plantillas de sistema (Supervisor, Aprobador, Admin WorkForce) y perfiles propios.
-                Los de sistema no se eliminan; los propios sí, si nadie los usa.
-              </p>
+              </h2>            
             </div>
             <Button
               type="button"

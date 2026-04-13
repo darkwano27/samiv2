@@ -178,4 +178,28 @@ export class UserSignatureService {
       display_name: workerName,
     };
   }
+
+  /**
+   * Firma guardada en Mi firma para otro trabajador (p. ej. PDF de boleta HE firmado por el aprobador).
+   */
+  async getSignatureForPdf(workerId: string): Promise<{
+    display_name: string;
+    effective_data_url: string | null;
+  }> {
+    const id = workerId.trim();
+    const [w] = await this.db
+      .select({ name: workers.name })
+      .from(workers)
+      .where(eq(workers.id, id))
+      .limit(1);
+    const [row] = await this.db
+      .select()
+      .from(workerSignatures)
+      .where(eq(workerSignatures.workerId, id))
+      .limit(1);
+    return {
+      display_name: (w?.name ?? '').trim() || id,
+      effective_data_url: effectiveDataUrl(row),
+    };
+  }
 }

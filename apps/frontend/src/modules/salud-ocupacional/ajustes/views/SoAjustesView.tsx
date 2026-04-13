@@ -218,13 +218,13 @@ export function SoAjustesView() {
     setFormError(null);
     const w = newMemberSap.trim();
     if (!w) {
-      setFormError('Ingresa el código SAP o busca por nombre.');
+      setFormError('Ingresa el código o busca por nombre.');
       return;
     }
     const looksLikeSapOnly = /^\d+$/.test(w);
     if (!looksLikeSapOnly && !newMemberPickedFromLookup) {
       setFormError(
-        'Elige una persona de la lista de sugerencias o ingresa solo el código numérico SAP.',
+        'Elige una persona de la lista de sugerencias o ingresa solo el código numérico.',
       );
       return;
     }
@@ -249,16 +249,12 @@ export function SoAjustesView() {
   }
 
   return (
-    <div className="mx-auto min-h-0 w-full max-w-5xl flex-1 flex-col gap-4 p-3 sm:gap-6 sm:p-4 md:p-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="mx-auto min-h-0 w-full max-w-5xl flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-4 md:p-5">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
-            Gestión roles — Salud ocupacional
+          <h1 className="font-heading text-xl font-semibold leading-tight tracking-tight sm:text-2xl">
+            Ajustes — Salud ocupacional
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gestiona quién puede usar Salud ocupacional, qué perfil tiene cada persona y cómo están
-            definidos los perfiles.
-          </p>
         </div>
       </header>
 
@@ -309,7 +305,7 @@ export function SoAjustesView() {
       </div>
 
       {tab === 'miembros' ? (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {profilesQ.isLoading ? (
             <p className="text-sm text-muted-foreground">Cargando resumen de perfiles…</p>
           ) : (
@@ -341,13 +337,13 @@ export function SoAjustesView() {
               </CardDescription>
             </CardHeader>
             <CardContent className="overflow-visible space-y-3">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3">
                 <div className="relative min-w-0 flex-1 space-y-2">
-                  <Label htmlFor="so-new-sap">Código SAP o nombre</Label>
+                  <Label htmlFor="so-new-sap">Código o nombre</Label>
                   <Input
                     id="so-new-sap"
                     autoComplete="off"
-                    placeholder="SAP o al menos 2 caracteres para buscar"
+                    placeholder="Código o al menos 2 caracteres para buscar"
                     value={newMemberSap}
                     onChange={(e) => {
                       setNewMemberPickedFromLookup(false);
@@ -396,7 +392,9 @@ export function SoAjustesView() {
                             }}
                           >
                             <span className="font-medium">{s.name}</span>
-                            <span className="text-xs text-muted-foreground">SAP {s.sap_code}</span>
+                            <span className="text-xs text-muted-foreground">
+                              Código {s.sap_code}
+                            </span>
                           </button>
                         </li>
                       ))}
@@ -404,7 +402,7 @@ export function SoAjustesView() {
                       !workerLookupQ.isError &&
                       (workerLookupQ.data?.suggestions?.length ?? 0) === 0 ? (
                         <li className="px-3 py-2 text-muted-foreground">
-                          Sin coincidencias. Prueba con otro texto o el código SAP completo.
+                          Sin coincidencias. Prueba con otro texto o el código completo.
                         </li>
                       ) : null}
                     </ul>
@@ -432,7 +430,7 @@ export function SoAjustesView() {
                     className="invisible hidden select-none text-sm font-medium leading-none sm:block"
                     aria-hidden
                   >
-                    Código SAP o nombre
+                    Código o nombre
                   </span>
                   <Button
                     type="button"
@@ -460,13 +458,13 @@ export function SoAjustesView() {
             <CardContent className="space-y-3 p-0 sm:p-2">
               <div className="px-4 sm:px-2">
                 <Label htmlFor="so-members-search" className="sr-only">
-                  Buscar por SAP o nombre
+                  Buscar por código o nombre
                 </Label>
                 <Input
                   id="so-members-search"
                   type="search"
                   autoComplete="off"
-                  placeholder="Buscar por SAP o nombre…"
+                  placeholder="Buscar por código o nombre…"
                   value={memberSearchInput}
                   onChange={(e) => setMemberSearchInput(e.target.value)}
                   className="min-h-11 max-w-md"
@@ -535,7 +533,7 @@ export function SoAjustesView() {
                                   <div className="min-w-0">
                                     <p className="truncate font-medium">{display}</p>
                                     <p className="text-xs text-muted-foreground">
-                                      SAP {m.worker_id}
+                                      Código {m.worker_id}
                                     </p>
                                   </div>
                                 </div>
@@ -620,18 +618,13 @@ export function SoAjustesView() {
       ) : null}
 
       {tab === 'perfiles' ? (
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="flex items-center gap-2 font-heading text-base font-semibold">
                 <Settings2 className="h-4 w-4 text-primary" aria-hidden />
                 Perfiles del módulo
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Incluimos dos plantillas de sistema (Enfermera y Admin SO). Puedes crear las tuyas
-                con las acciones que necesites por aplicación. Las de sistema no se borran; las
-                propias sí, cuando no quede nadie usando ese perfil.
-              </p>
+              </h2>              
             </div>
             <Button
               type="button"
@@ -667,10 +660,10 @@ export function SoAjustesView() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {(profilesQ.data?.profiles ?? []).map((p) => (
                 <Card key={p.id} className="border-border/80 shadow-none">
-                  <CardHeader className="space-y-1.5 pb-3">
+                  <CardHeader className="space-y-1 pb-2.5">
                     <div className="flex items-start justify-between gap-3">
                       <CardTitle className="text-base leading-snug">{p.label}</CardTitle>
                       {p.is_seed ? (
@@ -680,7 +673,7 @@ export function SoAjustesView() {
                       ) : null}
                     </div>
                     {p.description ? (
-                      <CardDescription className="line-clamp-3 text-sm leading-relaxed">
+                      <CardDescription className="line-clamp-3 text-sm leading-snug">
                         {p.description}
                       </CardDescription>
                     ) : (
@@ -689,23 +682,19 @@ export function SoAjustesView() {
                       </CardDescription>
                     )}
                   </CardHeader>
-                  <CardContent className="space-y-4 text-sm">
-                    <dl className="space-y-2.5 text-sm">
-                      <div className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2.5">
+                  <CardContent className="space-y-3 text-sm">
+                    <dl className="space-y-2 text-sm">
+                      <div className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-2">
                         <dt className="text-muted-foreground">Miembros con este perfil</dt>
                         <dd className="shrink-0 tabular-nums font-medium">{p.member_count}</dd>
                       </div>
-                      <div className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2.5">
+                      <div className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-2">
                         <dt className="text-muted-foreground">Roles incluidos</dt>
                         <dd className="shrink-0 tabular-nums">{p.role_count}</dd>
                       </div>
-                      <div className="flex items-baseline justify-between gap-4 border-b border-border/60 pb-2.5">
+                      <div className="flex items-baseline justify-between gap-3">
                         <dt className="text-muted-foreground">Aplicaciones</dt>
                         <dd className="shrink-0 tabular-nums">{p.unique_apps_count}</dd>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-4">
-                        <dt className="text-muted-foreground">Detalle en matriz de permisos</dt>
-                        <dd className="shrink-0 tabular-nums">{p.permission_matrix_cells}</dd>
                       </div>
                     </dl>
                     <div className="flex flex-col gap-2 sm:flex-row">

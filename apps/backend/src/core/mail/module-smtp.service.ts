@@ -165,7 +165,7 @@ export class ModuleSmtpService {
       to: to.trim(),
       subject: 'SAMI — Prueba de correo (módulo)',
       text:
-        'Si recibís este mensaje, el envío SMTP configurado para el módulo es correcto.',
+        'Si recibiste este mensaje, el envío SMTP configurado para el módulo es correcto.',
     });
   }
 

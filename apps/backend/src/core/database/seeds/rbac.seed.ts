@@ -75,13 +75,13 @@ const APP_DEFS = [
   {
     slug: 'registro-horas-extra',
     moduleSlug: 'horas-extra',
-    label: 'Registro de horas extra',
+    label: 'Boletas Horas Extra',
     isManagement: false,
   },
   {
     slug: 'aprobacion-horas-extra',
     moduleSlug: 'horas-extra',
-    label: 'Aprobación de horas extra',
+    label: 'Bandeja / aprobación (rol técnico)',
     isManagement: false,
   },
   {
@@ -797,7 +797,7 @@ async function seedWorkforceProfiles(
       slug: 'aprobador-he',
       label: 'Aprobador',
       description:
-        'Mismas operaciones que supervisor en boletas, más la app de aprobación y bandeja.',
+        'Registro de boletas y bandeja con permiso de aprobación en las subdivisiones asignadas.',
       roleKeys: ['registro-horas-extra:supervisor', 'aprobacion-horas-extra:aprobador'],
     },
     {

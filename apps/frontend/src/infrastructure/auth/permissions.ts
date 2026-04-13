@@ -47,6 +47,20 @@ function isManagedModuleForNavApp(session: Session, navAppSlug: string): boolean
 /** Sesión de permisos alineada a `GET /auth/me` (mapeo ya hecho en `AuthApiRepository`). */
 export type Session = MeResult;
 
+/**
+ * Entrada única en sidebar: `/horas-extra/registro-horas-extra`.
+ * Quien solo tenga la app técnica `aprobacion-horas-extra` también entra ahí.
+ */
+export function canAccessBoletasHorasExtraNav(session: Session | null): boolean {
+  if (!RBAC_ENABLED) return true;
+  if (!session) return false;
+  if (session.isSuperadmin) return true;
+  return (
+    canAccessApp(session, 'registro-horas-extra') ||
+    canAccessApp(session, 'aprobacion-horas-extra')
+  );
+}
+
 export function canAccessApp(session: Session | null, appSlug: string): boolean {
   if (!RBAC_ENABLED) {
     /** Alineado con `SaludOcupacionalModuleAdminGuard`: sin RBAC en UI igual hace falta rol de gestión en backend. */
