@@ -263,11 +263,11 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignSelf: 'flex-start',
   },
-  sigCaption: { fontSize: 6.5, color: '#737373', marginBottom: 2 },
   sigCol: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  sigColProf: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   sigRow: {
     flexDirection: 'row',
-    paddingVertical: 5,
+    paddingVertical: 8,
     paddingHorizontal: 3,
     alignItems: 'stretch',
   },
@@ -276,9 +276,23 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     backgroundColor: '#e0e0e0',
   },
-  sigName: { fontSize: 6.5, color: '#666', marginTop: 2 },
+  sigPatientName: {
+    fontSize: 7.5,
+    fontWeight: 700,
+    color: '#404040',
+    textAlign: 'center',
+    marginBottom: 5,
+    textTransform: 'uppercase',
+  },
+  sigCaptionUnder: {
+    fontSize: 6.5,
+    color: '#737373',
+    marginTop: 5,
+    textAlign: 'center',
+  },
   sigPlaceholder: { fontSize: 7, color: '#aaa', fontStyle: 'italic' },
-  sigImg: { width: 148, height: 34, objectFit: 'contain' as const },
+  sigImgPatient: { width: 210, height: 62, objectFit: 'contain' as const },
+  sigImgProf: { width: 230, height: 72, objectFit: 'contain' as const },
 });
 
 const DISCHARGE_LABEL: Record<string, string> = {
@@ -304,6 +318,8 @@ function isRenderableImageDataUrl(s: string | undefined | null): boolean {
   return Boolean(t && t.startsWith('data:image'));
 }
 
+export type ConsultationPdfAttentionRowVariant = 'attended_by' | 'alerta_medica';
+
 type Props = {
   detail: Exclude<ConsultationDetail, null>;
   /** Nombre del profesional que atiende (sin código). */
@@ -311,6 +327,11 @@ type Props = {
   /** Firma o sello desde Mi firma (`worker_signatures`). */
   professionalSignatureDataUrl?: string | null;
   logoSrc?: string;
+  /**
+   * `alerta_medica`: solo perfil de módulo SO "Supervisor" (etiqueta + texto fijo).
+   * Admin SO y enfermera usan `attended_by` (nombre completo).
+   */
+  attentionRowVariant?: ConsultationPdfAttentionRowVariant;
 };
 
 export function ConsultationPdfDocument({
@@ -318,6 +339,7 @@ export function ConsultationPdfDocument({
   professionalDisplayName,
   professionalSignatureDataUrl,
   logoSrc,
+  attentionRowVariant = 'attended_by',
 }: Props) {
   const discharge =
     DISCHARGE_LABEL[detail.dischargeCondition] ?? detail.dischargeCondition;
@@ -329,6 +351,7 @@ export function ConsultationPdfDocument({
 
   const referredNameOnly = (detail.referredByName ?? '').trim();
   const attendedName = (professionalDisplayName ?? '').trim() || '—';
+  const isAlertaMedica = attentionRowVariant === 'alerta_medica';
 
   return (
     <Document>
@@ -411,9 +434,11 @@ export function ConsultationPdfDocument({
           </View>
           <View style={styles.box}>
             <View style={styles.row}>
-              <Text style={styles.cellLabel}>ATENDIDO POR</Text>
+              <Text style={styles.cellLabel}>
+                {isAlertaMedica ? 'ALERTA MÉDICA' : 'ATENDIDO POR'}
+              </Text>
               <Text style={[styles.cellValFull, { borderBottomWidth: 0.5 }]}>
-                {attendedName}
+                {isAlertaMedica ? 'Alerta médica' : attendedName}
               </Text>
             </View>
             <View style={styles.row}>
@@ -450,8 +475,7 @@ export function ConsultationPdfDocument({
           </View>
           <View style={styles.clinicalBox}>
             <View style={styles.dxHeaderClinical}>
-              <Text style={[styles.dxThClinical, { width: '10%' }]}>#</Text>
-              <Text style={[styles.dxThClinical, { width: '22%' }]}>CIE-10</Text>
+              <Text style={[styles.dxThClinical, { width: '12%' }]}>#</Text>
               <Text style={[styles.dxThClinical, { flex: 1, borderRightWidth: 0 }]}>
                 DIAGNÓSTICO
               </Text>
@@ -470,14 +494,9 @@ export function ConsultationPdfDocument({
                   ]}
                 >
                   <Text
-                    style={[styles.dxCellClinical, { width: '10%', textAlign: 'center' }]}
+                    style={[styles.dxCellClinical, { width: '12%', textAlign: 'center' }]}
                   >
                     {i + 1}
-                  </Text>
-                  <Text
-                    style={[styles.dxCellClinical, styles.dxCode, { width: '22%', fontSize: 8 }]}
-                  >
-                    {d.code ?? '—'}
                   </Text>
                   <Text style={[styles.dxCellClinical, styles.dxNameClinical, { flex: 1, borderRightWidth: 0 }]}>
                     {d.name}
@@ -535,23 +554,19 @@ export function ConsultationPdfDocument({
           <View style={styles.box}>
             <View style={styles.sigRow}>
               <View style={styles.sigCol}>
-                <Text style={styles.sigCaption}>Firma del paciente</Text>
+                <Text style={styles.sigPatientName}>{detail.patientName}</Text>
                 {hasPatientSig && patientSig ? (
-                  <Image src={patientSig} style={styles.sigImg} />
+                  <Image src={patientSig} style={styles.sigImgPatient} />
                 ) : (
                   <Text style={styles.sigPlaceholder}>Sin firma del paciente</Text>
                 )}
-                <Text style={styles.sigName}>{detail.patientName}</Text>
+                <Text style={styles.sigCaptionUnder}>Firma del paciente</Text>
               </View>
               <View style={styles.sigDivider} />
-              <View style={styles.sigCol}>
-                <Text style={styles.sigCaption}>Firma o sello del profesional</Text>
+              <View style={styles.sigColProf}>
                 {hasProfSig && profSig ? (
-                  <Image src={profSig} style={styles.sigImg} />
-                ) : (
-                  <Text style={styles.sigPlaceholder}>Sin firma / sello registrado</Text>
-                )}
-                <Text style={styles.sigName}>{attendedName}</Text>
+                  <Image src={profSig} style={styles.sigImgProf} />
+                ) : null}
               </View>
             </View>
           </View>

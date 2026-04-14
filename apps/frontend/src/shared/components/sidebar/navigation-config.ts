@@ -104,6 +104,13 @@ export const MODULES: NavModule[] = [
         description: 'Historial médico del worker',
         icon: 'FileHeart',
       },
+      {
+        slug: 'reportes-so',
+        label: 'Reportes',
+        path: '/salud-ocupacional/reportes',
+        description: 'Indicadores y exportación PDF del módulo',
+        icon: 'BarChart3',
+      },
       /**
        * UI &quot;Ajustes&quot;: acceso vía `managed_module_slugs` o rol en apps del módulo.
        * Catálogo RBAC: `salud-ocupacional-gestion` (app de gestión del módulo).

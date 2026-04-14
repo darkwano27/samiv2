@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, gt, isNull, or } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { SAMI_DB } from '@core/database/database.module';
 import * as schema from '@core/database/schema';
 import { rbacAppFeatures } from '@core/database/schema/rbac/app-features';
 import { rbacApps } from '@core/database/schema/rbac/apps';
 import { rbacRolePermissions } from '@core/database/schema/rbac/role-permissions';
+import { rbacModuleProfiles } from '@core/database/schema/rbac/module-profiles';
 import { rbacRoles } from '@core/database/schema/rbac/roles';
 import { rbacWorkerRoleAssignments } from '@core/database/schema/rbac/worker-role-assignments';
 import type {
@@ -170,5 +171,35 @@ export class RbacService {
         ),
       );
     return [...new Set(rows.map((r) => r.workerId))];
+  }
+
+  /**
+   * Perfil de módulo **custom** SO "Supervisor" (`slug` o `label` = supervisor, sin distinguir mayúsculas).
+   * Único caso en que la ficha PDF usa la fila "Alerta médica" (admin y enfermera van con nombre en "Atendido por").
+   */
+  async workerHasSaludOcupacionalSupervisorModuleProfile(
+    workerId: string,
+  ): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: rbacWorkerRoleAssignments.id })
+      .from(rbacWorkerRoleAssignments)
+      .innerJoin(
+        rbacModuleProfiles,
+        eq(rbacModuleProfiles.id, rbacWorkerRoleAssignments.appliedProfileId),
+      )
+      .where(
+        and(
+          eq(rbacWorkerRoleAssignments.workerId, workerId),
+          isNotNull(rbacWorkerRoleAssignments.appliedProfileId),
+          eq(rbacModuleProfiles.moduleSlug, 'salud-ocupacional'),
+          or(
+            sql`lower(${rbacModuleProfiles.slug}) = 'supervisor'`,
+            sql`lower(trim(${rbacModuleProfiles.label})) = 'supervisor'`,
+          ),
+          this.activeAssignmentFilter(),
+        ),
+      )
+      .limit(1);
+    return Boolean(row);
   }
 }

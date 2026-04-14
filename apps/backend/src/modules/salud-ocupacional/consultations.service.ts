@@ -288,12 +288,22 @@ export class ConsultationsService {
             `Logo SO presente en disco pero no se pudo cargar para el PDF: ${logoPath}`,
           );
         }
+        const creatorSap = detail.createdBy.trim();
+        const hasSupervisorProfile =
+          await this.rbac.workerHasSaludOcupacionalSupervisorModuleProfile(
+            creatorSap,
+          );
+        const attentionRowVariant = hasSupervisorProfile
+          ? 'alerta_medica'
+          : 'attended_by';
+
         const buffer = await this.pdf.renderToBuffer(
           createElement(ConsultationPdfDocument, {
             detail,
             professionalDisplayName: professionalDisplayNameForPdf,
             professionalSignatureDataUrl,
             logoSrc,
+            attentionRowVariant,
           }) as PdfDocumentElement,
         );
         const codSafe = detail.patientCod.trim().replace(/[^\w.-]+/g, '_');
