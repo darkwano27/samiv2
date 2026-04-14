@@ -196,7 +196,7 @@ export function BoletaHePdfDocument({
             <Image src={approverSignatureSrc} style={styles.signImg} />
           ) : (
             <Text style={styles.signHint}>
-              Sin firma digital cargada en el perfil del aprobador. Podés agregarla en Mi firma.
+              Sin firma digital cargada en el perfil del aprobador. puedes agregarla en Mi firma.
             </Text>
           )}
           <View style={styles.signLine}>

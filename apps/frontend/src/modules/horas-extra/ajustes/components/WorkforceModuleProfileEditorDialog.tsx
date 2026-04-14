@@ -266,7 +266,7 @@ export function WorkforceModuleProfileEditorDialog({ open, mode, profileId, onCl
             <div className="space-y-4">
               {isSeed ? (
                 <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                  Este perfil viene con el sistema: podés cambiar el nombre y la descripción.
+                  Este perfil viene con el sistema: puedes cambiar el nombre y la descripción.
                 </p>
               ) : (
                 <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -406,7 +406,7 @@ export function WorkforceModuleProfileEditorDialog({ open, mode, profileId, onCl
           ) : (
             <span className="hidden text-xs text-muted-foreground sm:inline">
               {mode === 'edit' && detailQ.data?.member_count
-                ? 'No podés borrarlo: todavía hay personas con este perfil asignado.'
+                ? 'No puedes borrarlo: todavía hay personas con este perfil asignado.'
                 : ''}
             </span>
           )}

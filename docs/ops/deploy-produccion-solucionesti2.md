@@ -156,7 +156,7 @@ Asegurate de incluir **`pnpm-lock.yaml`** para poder usar `pnpm install --frozen
 
 ### 5.4 Opción C — Solo Git local en el servidor
 
-Podés `git init` dentro de `/opt/sami-v2` y hacer `git pull` desde un remoto interno (GitLab Gitea, etc.) con la misma idea que la opción A.
+puedes `git init` dentro de `/opt/sami-v2` y hacer `git pull` desde un remoto interno (GitLab Gitea, etc.) con la misma idea que la opción A.
 
 ---
 

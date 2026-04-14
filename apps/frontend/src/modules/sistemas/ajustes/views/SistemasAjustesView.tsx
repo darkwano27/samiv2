@@ -643,7 +643,7 @@ export function SistemasAjustesView() {
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Hay cuatro plantillas de sistema (Soporte, Aplicaciones, Infraestructura y Admin
-                Sistemas). Podés crear perfiles propios con las acciones por aplicación. Los de
+                Sistemas). puedes crear perfiles propios con las acciones por aplicación. Los de
                 sistema no se borran; los propios sí, cuando no quede nadie usando ese perfil.
               </p>
             </div>

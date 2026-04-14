@@ -687,7 +687,7 @@ export function RegistroHorasExtraView({
       </div>
 
       {scopeQ.isLoading ? (
-        <p className="text-sm text-muted-foreground">Cargando las subdivisiones que podés usar…</p>
+        <p className="text-sm text-muted-foreground">Cargando las subdivisiones que puedes usar…</p>
       ) : scopeQ.isError ? (
         <p className="text-sm text-destructive">
           No pudimos cargar la información. Actualizá la página o avisá a sistemas si sigue igual.
@@ -797,7 +797,7 @@ export function RegistroHorasExtraView({
                 ) : null}
                 <div className="space-y-1">
                   <Label className="text-[10px] uppercase text-muted-foreground">
-                    Subdivisión (podés marcar varias de esta misma división)
+                    Subdivisión (puedes marcar varias de esta misma división)
                   </Label>
                   {!activeGroup ? (
                     <p className="text-xs text-muted-foreground">Elegí una división.</p>
@@ -843,7 +843,7 @@ export function RegistroHorasExtraView({
                   ))}
                 </select>
                 <p className="text-[10px] leading-tight text-muted-foreground">
-                  Elegí un motivo para copiarlo al paso 2; en cada fila podés cambiarlo si hace falta.
+                  Elegí un motivo para copiarlo al paso 2; en cada fila puedes cambiarlo si hace falta.
                 </p>
               </div>
             </div>

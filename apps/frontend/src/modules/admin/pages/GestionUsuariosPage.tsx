@@ -146,7 +146,7 @@ export function GestionUsuariosPage() {
         className={tab !== 'admins-modulo' ? 'hidden' : undefined}
       >
         <p className="mb-4 max-w-3xl text-sm text-muted-foreground">
-          Mismos módulos que en el menú lateral (Horas extra, Salud ocupacional, Visitas, etc.). Podés{' '}
+          Mismos módulos que en el menú lateral (Horas extra, Salud ocupacional, Visitas, etc.). puedes{' '}
           <strong>asignar un admin del módulo</strong> con el código SAP del trabajador (rol{' '}
           <code className="text-xs">module-admin</code> sobre la app de gestión de ese módulo). El
           trabajador debe existir en la tabla <code className="text-xs">workers</code>.

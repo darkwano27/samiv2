@@ -416,22 +416,207 @@ function revokePhotoPreviewUrl(previewUrl: string) {
   if (previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
 }
 
+const AB_ACTA_WORKER_SESSION_KEY = 'sami.ab-acta.worker.v1';
+const AB_ACTA_PHOTO_IDB_NAME = 'sami-ab-acta-photo-draft';
+const AB_ACTA_PHOTO_IDB_STORE = 'bySap';
+const AB_ACTA_SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const AB_ACTA_IDB_DRAFT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+type AbActaWorkerSession = { sap: string; name: string; email: string; savedAt: number };
+
+function readAbActaWorkerSession(): AbActaWorkerSession | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(AB_ACTA_WORKER_SESSION_KEY);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as Partial<AbActaWorkerSession>;
+    if (typeof o.sap !== 'string' || o.sap.length === 0) return null;
+    if (typeof o.savedAt !== 'number' || Number.isNaN(o.savedAt)) return null;
+    if (Date.now() - o.savedAt > AB_ACTA_SESSION_MAX_AGE_MS) {
+      sessionStorage.removeItem(AB_ACTA_WORKER_SESSION_KEY);
+      return null;
+    }
+    return {
+      sap: o.sap,
+      name: typeof o.name === 'string' ? o.name : '',
+      email: typeof o.email === 'string' ? o.email : '',
+      savedAt: o.savedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeAbActaWorkerSession(data: Pick<AbActaWorkerSession, 'sap' | 'name' | 'email'>): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    const payload: AbActaWorkerSession = { ...data, savedAt: Date.now() };
+    sessionStorage.setItem(AB_ACTA_WORKER_SESSION_KEY, JSON.stringify(payload));
+  } catch {
+    /* quota / modo privado */
+  }
+}
+
+function clearAbActaWorkerSession(): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.removeItem(AB_ACTA_WORKER_SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+type AbActaIdbPhotoRow = {
+  id: string;
+  fileName: string;
+  type: string;
+  buffer: ArrayBuffer;
+};
+
+type AbActaIdbPayload = { v: 1; savedAt: number; items: AbActaIdbPhotoRow[] };
+
+function abActaOpenPhotoIdb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('indexedDB no disponible'));
+      return;
+    }
+    const req = indexedDB.open(AB_ACTA_PHOTO_IDB_NAME, 1);
+    req.onerror = () => reject(req.error ?? new Error('idb open'));
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(AB_ACTA_PHOTO_IDB_STORE)) {
+        db.createObjectStore(AB_ACTA_PHOTO_IDB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+  });
+}
+
+async function abActaIdbGetPayload(sap: string): Promise<AbActaIdbPayload | null> {
+  let db: IDBDatabase | null = null;
+  try {
+    db = await abActaOpenPhotoIdb();
+    const row = await new Promise<AbActaIdbPayload | undefined>((resolve, reject) => {
+      const tx = db!.transaction(AB_ACTA_PHOTO_IDB_STORE, 'readonly');
+      const r = tx.objectStore(AB_ACTA_PHOTO_IDB_STORE).get(sap);
+      r.onerror = () => reject(r.error);
+      tx.onerror = () => reject(tx.error ?? new Error('idb read tx'));
+      tx.oncomplete = () => resolve(r.result as AbActaIdbPayload | undefined);
+    });
+    if (!row || row.v !== 1 || !Array.isArray(row.items)) return null;
+    if (Date.now() - row.savedAt > AB_ACTA_IDB_DRAFT_MAX_AGE_MS) {
+      await abActaIdbDeleteSap(sap);
+      return null;
+    }
+    return row;
+  } catch {
+    return null;
+  } finally {
+    db?.close();
+  }
+}
+
+async function abActaIdbPutPayload(sap: string, items: AbActaIdbPhotoRow[]): Promise<void> {
+  let db: IDBDatabase | null = null;
+  try {
+    db = await abActaOpenPhotoIdb();
+    const payload: AbActaIdbPayload = { v: 1, savedAt: Date.now(), items };
+    await new Promise<void>((resolve, reject) => {
+      const tx = db!.transaction(AB_ACTA_PHOTO_IDB_STORE, 'readwrite');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('idb tx'));
+      tx.objectStore(AB_ACTA_PHOTO_IDB_STORE).put(payload, sap);
+    });
+  } catch {
+    /* ignore */
+  } finally {
+    db?.close();
+  }
+}
+
+async function abActaIdbDeleteSap(sap: string): Promise<void> {
+  let db: IDBDatabase | null = null;
+  try {
+    db = await abActaOpenPhotoIdb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db!.transaction(AB_ACTA_PHOTO_IDB_STORE, 'readwrite');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error ?? new Error('idb tx'));
+      tx.objectStore(AB_ACTA_PHOTO_IDB_STORE).delete(sap);
+    });
+  } catch {
+    /* ignore */
+  } finally {
+    db?.close();
+  }
+}
+
+function newReportPhotoId(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `ph-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+async function abActaIdbRowsFromFiles(
+  files: File[],
+  idFactory: () => string,
+): Promise<AbActaIdbPhotoRow[]> {
+  return Promise.all(
+    files.map(async (f) => ({
+      id: idFactory(),
+      fileName: f.name?.trim() || 'foto.jpg',
+      type: (f.type || 'image/jpeg').trim() || 'image/jpeg',
+      buffer: await f.arrayBuffer(),
+    })),
+  );
+}
+
+async function abActaIdbRowsFromExistingPhotos(
+  photos: { id: string; fileName: string; file: File }[],
+): Promise<AbActaIdbPhotoRow[]> {
+  return Promise.all(
+    photos.map(async (p) => ({
+      id: p.id,
+      fileName: p.fileName,
+      type: (p.file.type || 'image/jpeg').trim() || 'image/jpeg',
+      buffer: await p.file.arrayBuffer(),
+    })),
+  );
+}
+
+/** Persiste en disco antes de generar miniaturas (si el navegador recarga al volver de la cámara). */
+async function abActaIdbMergeCurrentAndNewFiles(
+  sap: string,
+  currentPhotos: { id: string; fileName: string; file: File }[],
+  newFiles: File[],
+): Promise<void> {
+  if (!newFiles.length && !currentPhotos.length) return;
+  const prevRows = await abActaIdbRowsFromExistingPhotos(currentPhotos);
+  const nextRows = await abActaIdbRowsFromFiles(newFiles, newReportPhotoId);
+  const merged = [...prevRows, ...nextRows].slice(0, ACTA_PHOTO_MAX_COUNT);
+  await abActaIdbPutPayload(sap, merged);
+}
+
 type ReportKind = 'entrega' | 'devolucion';
 
 export function AsignacionBienesView() {
   const queryClient = useQueryClient();
   const { session } = getRouteApi('/_authenticated').useRouteContext();
   const canOperarCreate = canDo(session, 'asignacion-bienes', 'operar', 'create');
-  const [searchInput, setSearchInput] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
+  const initialWorker = readAbActaWorkerSession();
+  const [searchInput, setSearchInput] = useState(() => initialWorker?.sap ?? '');
+  const [debouncedQ, setDebouncedQ] = useState(() => initialWorker?.sap?.trim() ?? '');
   const [lookupOpen, setLookupOpen] = useState(false);
-  const [selectedSap, setSelectedSap] = useState<string | null>(null);
-  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [selectedSap, setSelectedSap] = useState<string | null>(() => initialWorker?.sap ?? null);
+  const [selectedName, setSelectedName] = useState<string | null>(() => initialWorker?.name ?? null);
   const commentsRef = useRef<Record<number, string>>({});
   const [sorting, setSorting] = useState<SortingState>([{ id: 'fecha_asignacion', desc: true }]);
   const [pageError, setPageError] = useState<string | null>(null);
   /** Correo destino del PDF: default desde SAP (corporativo → personal); editable. */
-  const [reportRecipientEmail, setReportRecipientEmail] = useState('');
+  const [reportRecipientEmail, setReportRecipientEmail] = useState(
+    () => initialWorker?.email?.trim() ?? '',
+  );
   const [reportKind, setReportKind] = useState<ReportKind>('entrega');
   const [reportActDate, setReportActDate] = useState(() => localDateInputValue());
   const [additionalSignerHit, setAdditionalSignerHit] = useState<AbSapWorkerHit | null>(null);
@@ -441,6 +626,10 @@ export function AsignacionBienesView() {
   const [reportPhotos, setReportPhotos] = useState<
     { id: string; fileName: string; previewUrl: string; file: File }[]
   >([]);
+  const reportPhotosRef = useRef(reportPhotos);
+  reportPhotosRef.current = reportPhotos;
+  const actaPhotosScrollAnchorRef = useRef<HTMLDivElement | null>(null);
+  const prevReportPhotosLenRef = useRef(0);
   const [workerSignatureDataUrl, setWorkerSignatureDataUrl] = useState<string | null>(null);
   const [sigModalOpen, setSigModalOpen] = useState(false);
   const [distributeModalOpen, setDistributeModalOpen] = useState(false);
@@ -466,6 +655,7 @@ export function AsignacionBienesView() {
   }, [addSignerInput]);
 
   useEffect(() => {
+    prevReportPhotosLenRef.current = 0;
     setReportActDate(localDateInputValue());
     setReportKind('entrega');
     setAdditionalSignerHit(null);
@@ -518,7 +708,77 @@ export function AsignacionBienesView() {
     queryKey: ['sistemas', 'asignacion-bienes', 'assets', selectedSap ?? ''],
     queryFn: () => abFetchAssets(selectedSap!),
     enabled: Boolean(selectedSap),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if (!selectedSap) return;
+    writeAbActaWorkerSession({
+      sap: selectedSap,
+      name: selectedName?.trim() ?? '',
+      email: reportRecipientEmail,
+    });
+  }, [selectedSap, selectedName, reportRecipientEmail]);
+
+  useEffect(() => {
+    if (!selectedSap) return;
+    let cancelled = false;
+    void (async () => {
+      const payload = await abActaIdbGetPayload(selectedSap);
+      if (cancelled || !payload?.items.length) return;
+      const restored = await Promise.all(
+        payload.items.map(async (row) => {
+          const file = new File([row.buffer], row.fileName, {
+            type: row.type || 'image/jpeg',
+          });
+          const previewUrl = await fileToThumbnailPreviewUrl(file);
+          return { id: row.id, fileName: row.fileName, previewUrl, file };
+        }),
+      );
+      if (cancelled) {
+        restored.forEach((p) => revokePhotoPreviewUrl(p.previewUrl));
+        return;
+      }
+      setReportPhotos((prev) => {
+        if (prev.length > 0) return prev;
+        return restored;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSap]);
+
+  useEffect(() => {
+    if (!selectedSap || reportPhotos.length === 0) return;
+    const id = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const rows = await abActaIdbRowsFromExistingPhotos(reportPhotos);
+          await abActaIdbPutPayload(selectedSap, rows);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }, 500);
+    return () => window.clearTimeout(id);
+  }, [selectedSap, reportPhotos]);
+
+  useEffect(() => {
+    const n = reportPhotos.length;
+    const prev = prevReportPhotosLenRef.current;
+    prevReportPhotosLenRef.current = n;
+    if (n === 0 || n <= prev) return;
+    const el = actaPhotosScrollAnchorRef.current;
+    if (!el) return;
+    const run = () => {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth', inline: 'nearest' });
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(run);
+    });
+  }, [reportPhotos.length]);
 
   useLayoutEffect(() => {
     commentsRef.current = {};
@@ -652,6 +912,7 @@ export function AsignacionBienesView() {
   }
 
   function cancelActaDraft() {
+    if (selectedSap) void abActaIdbDeleteSap(selectedSap);
     setWorkerSignatureDataUrl(null);
     setSigModalOpen(false);
     setReportPhotos((prev) => {
@@ -687,6 +948,8 @@ export function AsignacionBienesView() {
   }
 
   function clearWorker() {
+    if (selectedSap) void abActaIdbDeleteSap(selectedSap);
+    clearAbActaWorkerSession();
     setSelectedSap(null);
     setSelectedName(null);
     setSearchInput('');
@@ -845,7 +1108,7 @@ export function AsignacionBienesView() {
       const { webUrl } = await abPostActaSharepoint(body);
       setDistributeFeedback({
         type: 'ok',
-        text: `Archivo subido. Podés abrirlo desde: ${webUrl}`,
+        text: `Archivo subido. Puedes abrirlo desde: ${webUrl}`,
       });
     } catch (e) {
       setDistributeFeedback({
@@ -941,17 +1204,13 @@ export function AsignacionBienesView() {
           </h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          Busca la persona por su codigo SAP o por el apellido.
+          Busca la persona por su código o por el apellido.
         </p>
       </header>
 
-      <Card className="overflow-visible">
+      <Card className="shrink-0 overflow-visible">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">1. ¿Quién es la persona?</CardTitle>
-          <CardDescription>
-            Escribí el código SAP o varias letras del apellido. Si buscás por nombre, usá al menos dos
-            letras.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 overflow-visible">
           <div className="relative z-10 max-w-xl space-y-2">
@@ -1054,7 +1313,7 @@ export function AsignacionBienesView() {
         : null}
 
       {selectedSap ? (
-        <Card>
+        <Card className="shrink-0 overflow-visible">
           <CardHeader className="pb-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -1086,7 +1345,7 @@ export function AsignacionBienesView() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="min-h-0 overflow-x-auto">
             {pageError ? (
               <p className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                 {pageError}
@@ -1208,7 +1467,7 @@ export function AsignacionBienesView() {
 
       {selectedSap && hasAssets && glpiLinked && canOperarCreate ? (
         <>
-          <Card className="relative z-10 overflow-visible border-primary/20 bg-primary/[0.03] dark:bg-primary/10">
+          <Card className="relative z-10 shrink-0 overflow-visible border-primary/20 bg-primary/[0.03] dark:bg-primary/10">
             <CardHeader className="pb-2">
               <div className="flex gap-2">
                 <FileText className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
@@ -1253,10 +1512,6 @@ export function AsignacionBienesView() {
                   value={reportRecipientEmail}
                   onChange={(e) => setReportRecipientEmail(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Si ya tenemos un correo de la empresa para esa persona, lo sugerimos acá; si no, el
-                  personal. Podés cambiarlo cuando quieras.
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -1269,10 +1524,6 @@ export function AsignacionBienesView() {
                     ¿Firma otra persona por él o ella? (opcional)
                   </Label>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Por ejemplo el jefe o quien firme en representación. En el PDF se verá el nombre de
-                  la persona y, entre paréntesis, quien firmó por ella.
-                </p>
                 {additionalSignerHit ? (
                   <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-2">
                     <span className="text-sm">
@@ -1369,12 +1620,9 @@ export function AsignacionBienesView() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shrink-0 overflow-visible">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">4. Firma (opcional)</CardTitle>
-              <CardDescription>
-                Si querés, firmá quien recibe o entrega. El acta se puede generar y enviar sin firma.
-              </CardDescription>
             </CardHeader>
             <CardContent className="border-t border-border/60 pt-4">
               <button
@@ -1391,20 +1639,15 @@ export function AsignacionBienesView() {
                     : 'Tocá para firmar (opcional)'}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Con el dedo o el mouse; podés dejarlo vacío.
+                  Con el dedo o el mouse; Puedes dejarlo vacío.
                 </span>
               </button>
             </CardContent>
           </Card>
 
-          <Card className="overflow-visible">
+          <Card className="shrink-0 overflow-visible">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">5. Fotos de los equipos</CardTitle>
-              <CardDescription>
-                Podés usar la cámara o elegir archivos; solo van en el PDF del acta. Máximo{' '}
-                {ACTA_PHOTO_MAX_COUNT} fotos. En el celular, si la pestaña se recarga al sacar la foto,
-                suele ser por memoria del navegador: probá una foto a la vez o cerrar otras apps.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 border-t border-border/60 pt-4">
               <input
@@ -1420,6 +1663,13 @@ export function AsignacionBienesView() {
                   if (!list?.length) return;
                   try {
                     const stable = await cloneFilesFromFileList(list);
+                    if (selectedSap) {
+                      void abActaIdbMergeCurrentAndNewFiles(
+                        selectedSap,
+                        reportPhotosRef.current,
+                        stable,
+                      );
+                    }
                     appendReportPhotosFromFiles(stable);
                   } catch {
                     window.alert(
@@ -1443,6 +1693,13 @@ export function AsignacionBienesView() {
                   if (!list?.length) return;
                   try {
                     const stable = await cloneFilesFromFileList(list);
+                    if (selectedSap) {
+                      void abActaIdbMergeCurrentAndNewFiles(
+                        selectedSap,
+                        reportPhotosRef.current,
+                        stable,
+                      );
+                    }
                     appendReportPhotosFromFiles(stable);
                   } catch {
                     window.alert(
@@ -1453,6 +1710,42 @@ export function AsignacionBienesView() {
                   }
                 }}
               />
+              <div
+                ref={actaPhotosScrollAnchorRef}
+                className="scroll-mt-28 scroll-mb-32 sm:scroll-mb-36"
+              >
+                {reportPhotos.length > 0 ? (
+                  <>
+                    <p className="mb-2 text-xs font-medium text-foreground">Vista previa (también en el PDF)</p>
+                    <ul className="flex flex-wrap gap-3">
+                      {reportPhotos.map((p, i) => (
+                        <li key={p.id} className="relative">
+                          <img
+                            src={p.previewUrl}
+                            alt=""
+                            className="h-20 w-20 min-h-[5rem] min-w-[5rem] rounded-md border border-border bg-muted/30 object-cover"
+                            loading="eager"
+                            decoding="sync"
+                          />
+                          <button
+                            type="button"
+                            className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-xs shadow"
+                            aria-label={`Quitar ${p.fileName}`}
+                            onClick={() => removeReportPhoto(i)}
+                          >
+                            ×
+                          </button>
+                          <span className="mt-1 block max-w-[5rem] truncate text-[10px] text-muted-foreground">
+                            {p.fileName}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Todavía no hay fotos en este acta.</p>
+                )}
+              </div>
               <div className="grid max-w-lg grid-cols-1 gap-3 sm:grid-cols-2">
                 <label
                   htmlFor="ab-acta-camera"
@@ -1471,32 +1764,6 @@ export function AsignacionBienesView() {
                   <span className="text-xs text-muted-foreground">JPG, PNG, WebP</span>
                 </label>
               </div>
-              {reportPhotos.length > 0 ? (
-                <ul className="flex flex-wrap gap-3">
-                  {reportPhotos.map((p, i) => (
-                    <li key={p.id} className="relative">
-                      <img
-                        src={p.previewUrl}
-                        alt=""
-                        className="h-20 w-20 min-h-[5rem] min-w-[5rem] rounded-md border border-border object-cover"
-                        loading="eager"
-                        decoding="async"
-                      />
-                      <button
-                        type="button"
-                        className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-xs shadow"
-                        aria-label={`Quitar ${p.fileName}`}
-                        onClick={() => removeReportPhoto(i)}
-                      >
-                        ×
-                      </button>
-                      <span className="mt-1 block max-w-[5rem] truncate text-[10px] text-muted-foreground">
-                        {p.fileName}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
             </CardContent>
           </Card>
         </>
@@ -1512,8 +1779,16 @@ export function AsignacionBienesView() {
       />
 
       {showActaActions ? (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 px-3 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur supports-[backdrop-filter]:bg-background/90 md:sticky md:bottom-0 md:left-auto md:right-auto md:z-0 md:rounded-lg md:border md:shadow-none">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-background/95 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur supports-[backdrop-filter]:bg-background/90 md:sticky md:bottom-0 md:left-auto md:right-auto md:z-0 md:rounded-lg md:border md:shadow-none">
           <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:justify-end sm:gap-3">
+            {reportPhotos.length > 0 ? (
+              <p className="text-center text-xs text-muted-foreground sm:mr-auto sm:self-center sm:text-left">
+                <span className="font-medium text-foreground">
+                  {reportPhotos.length} {reportPhotos.length === 1 ? 'foto' : 'fotos'}
+                </span>{' '}
+                en el acta
+              </p>
+            ) : null}
             {generarActaError ? (
               <p className="text-sm text-destructive sm:mr-auto sm:self-center">{generarActaError}</p>
             ) : null}

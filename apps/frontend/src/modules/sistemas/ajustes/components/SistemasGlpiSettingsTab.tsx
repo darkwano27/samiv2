@@ -380,7 +380,7 @@ export function SistemasGlpiSettingsTab() {
               Conexión correcta
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              El servidor MySQL respondió; podés usar estos datos para Asignación de bienes.
+              El servidor MySQL respondió; puedes usar estos datos para Asignación de bienes.
             </p>
             <Button type="button" className="mt-4 min-h-11 w-full" onClick={() => setOkDialogOpen(false)}>
               Cerrar

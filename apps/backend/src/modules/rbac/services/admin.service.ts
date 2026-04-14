@@ -1947,7 +1947,7 @@ export class AdminService {
       if (r.is_management) {
         throw new BadRequestException({
           message:
-            'No podés incluir roles de la app de gestión del módulo en un perfil personalizado.',
+            'No puedes incluir roles de la app de gestión del módulo en un perfil personalizado.',
         });
       }
     }

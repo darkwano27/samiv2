@@ -453,7 +453,7 @@ export class RegistroHorasExtraService {
     }[];
     const visible = existingPairs.some((p) => allowed.has(pairKey(p.division_code, p.subdivision_code)));
     if (!visible) {
-      throw new ForbiddenException({ message: 'No podés editar esta boleta.' });
+      throw new ForbiddenException({ message: 'No puedes editar esta boleta.' });
     }
 
     await this.assertBoletaPayloadValid(supervisorSap, fullOrgAccess, body);
