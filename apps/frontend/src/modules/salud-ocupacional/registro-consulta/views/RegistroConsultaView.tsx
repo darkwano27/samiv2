@@ -52,6 +52,11 @@ function localInputToIso(local: string): string {
   return d.toISOString();
 }
 
+/** Texto del buscador SAP al elegir una persona (nombre completo + código). */
+function formatSapWorkerPickLabel(w: SoSapWorker): string {
+  return `${w.name} (${w.cod})`;
+}
+
 function initialsFromName(name: string): string {
   const p = name.trim().split(/\s+/).filter(Boolean);
   if (p.length === 0) return '?';
@@ -60,9 +65,9 @@ function initialsFromName(name: string): string {
 }
 
 const DISCHARGE_OPTIONS: { value: SoDischargeCondition; label: string }[] = [
-  { value: 'observacion', label: 'En observación' },
-  { value: 'recuperado', label: 'Recuperado' },
-  { value: 'derivado', label: 'Derivado al hospital' },
+  { value: 'observacion', label: 'OBSERVACION' },
+  { value: 'recuperado', label: 'RECUPERADO' },
+  { value: 'derivado', label: 'DERIVADO' },
 ];
 
 const selectClass =
@@ -127,8 +132,8 @@ export function RegistroConsultaView() {
   } | null>(null);
 
   const sapPatientQ = useSoSapSearch(patientQuery);
-  const sapReferrerQ = useSoSapSearch(referrerQuery);
-  const sapSupervisorQ = useSoSapSearch(supervisorQuery);
+  const sapReferrerQ = useSoSapSearch(selectedReferrer ? '' : referrerQuery);
+  const sapSupervisorQ = useSoSapSearch(selectedSupervisor ? '' : supervisorQuery);
   const dxQ = useSoDiagnoses();
   const createConsultation = useSoCreateConsultation();
 
@@ -252,7 +257,7 @@ export function RegistroConsultaView() {
         primaryWorkerEmail(selectedSupervisor);
       if (!supEm?.trim()) {
         setFormError(
-          'La persona de jefatura elegida no tiene correo en SAP. Elegí otra o quitá la selección.',
+          'La persona de jefatura elegida no tiene correo registrado. Elegí otra o quitá la selección.',
         );
         return;
       }
@@ -511,14 +516,38 @@ export function RegistroConsultaView() {
                 />
                 <Input
                   id="so-referrer-search"
-                  className="pl-9"
-                  value={referrerQuery}
-                  onChange={(e) => setReferrerQuery(e.target.value)}
-                  placeholder="Buscar por apellido o código…"
+                  className={cn(
+                    'pl-9',
+                    selectedReferrer ? 'pr-10' : undefined,
+                  )}
+                  value={
+                    selectedReferrer
+                      ? formatSapWorkerPickLabel(selectedReferrer)
+                      : referrerQuery
+                  }
+                  onChange={(e) => {
+                    if (selectedReferrer) setSelectedReferrer(null);
+                    setReferrerQuery(e.target.value);
+                  }}
+                  placeholder="Buscar por nombre, apellidos o código…"
                   autoComplete="off"
                 />
+                {selectedReferrer ? (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md hover:bg-muted/80"
+                    aria-label="Quitar derivado por"
+                    onClick={() => {
+                      setSelectedReferrer(null);
+                      setReferrerQuery('');
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
-              {referrerQuery.trim().length >= 1 &&
+              {!selectedReferrer &&
+              referrerQuery.trim().length >= 1 &&
               sapReferrerQ.data &&
               sapReferrerQ.data.length > 0 ? (
                 <ul className="max-h-36 overflow-y-auto rounded-md border border-border">
@@ -529,25 +558,12 @@ export function RegistroConsultaView() {
                         className="w-full px-3 py-2 text-left text-sm hover:bg-muted/60"
                         onClick={() => selectReferrer(w)}
                       >
-                        {w.name} <span className="text-muted-foreground">({w.cod})</span>
+                        {w.name}{' '}
+                        <span className="text-muted-foreground">({w.cod})</span>
                       </button>
                     </li>
                   ))}
                 </ul>
-              ) : null}
-              {selectedReferrer ? (
-                <p className="text-sm text-muted-foreground">
-                  Derivado por:{' '}
-                  <strong className="text-foreground">{selectedReferrer.name}</strong> (
-                  {selectedReferrer.cod})
-                  <button
-                    type="button"
-                    className="ml-2 text-primary underline"
-                    onClick={() => setSelectedReferrer(null)}
-                  >
-                    Quitar
-                  </button>
-                </p>
               ) : null}
             </div>
             <div className="space-y-1 sm:space-y-1.5">
@@ -655,10 +671,7 @@ export function RegistroConsultaView() {
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
-              </div>
-              <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-                Filtrá con el texto y tocá un resultado para agregarlo.
-              </p>
+              </div>              
             </div>
             {diagnosisIds.length > 0 ? (
               <ul className="flex flex-wrap gap-2">
@@ -683,11 +696,7 @@ export function RegistroConsultaView() {
                   );
                 })}
               </ul>
-            ) : (
-              <p className="text-xs text-muted-foreground sm:text-sm">
-                Sin diagnósticos aún.
-              </p>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       </section>
@@ -813,18 +822,42 @@ export function RegistroConsultaView() {
                 />
                 <Input
                   id="so-supervisor-search"
-                  className="pl-9"
-                  value={supervisorQuery}
-                  onChange={(e) => setSupervisorQuery(e.target.value)}
-                  placeholder="Apellidos o código del responsable…"
+                  className={cn(
+                    'pl-9',
+                    selectedSupervisor ? 'pr-10' : undefined,
+                  )}
+                  value={
+                    selectedSupervisor
+                      ? formatSapWorkerPickLabel(selectedSupervisor)
+                      : supervisorQuery
+                  }
+                  onChange={(e) => {
+                    if (selectedSupervisor) setSelectedSupervisor(null);
+                    setSupervisorQuery(e.target.value);
+                  }}
+                  placeholder="Nombre, apellidos o código del responsable…"
                   autoComplete="off"
                 />
+                {selectedSupervisor ? (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md hover:bg-muted/80"
+                    aria-label="Quitar jefatura"
+                    onClick={() => {
+                      setSelectedSupervisor(null);
+                      setSupervisorQuery('');
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
               </div>
               <p className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
                 Opcional. Si eliges jefatura, el sistema envía el PDF solo al paciente y un
                 segundo correo al responsable (sin PDF), con copia al paciente.
               </p>
-              {supervisorQuery.trim().length >= 1 &&
+              {!selectedSupervisor &&
+              supervisorQuery.trim().length >= 1 &&
               sapSupervisorQ.data &&
               sapSupervisorQ.data.length > 0 ? (
                 <ul className="max-h-36 overflow-y-auto rounded-md border border-border">
@@ -843,24 +876,6 @@ export function RegistroConsultaView() {
                     </li>
                   ))}
                 </ul>
-              ) : null}
-              {selectedSupervisor ? (
-                <p className="text-sm text-muted-foreground">
-                  Jefatura:{' '}
-                  <strong className="text-foreground">{selectedSupervisor.name}</strong>{' '}
-                  (
-                  {ccWorkerEmail(selectedSupervisor) ??
-                    primaryWorkerEmail(selectedSupervisor) ??
-                    'sin correo'}
-                  )
-                  <button
-                    type="button"
-                    className="ml-2 text-primary underline"
-                    onClick={() => setSelectedSupervisor(null)}
-                  >
-                    Quitar
-                  </button>
-                </p>
               ) : null}
             </div>
           </CardContent>

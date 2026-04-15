@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   index,
   pgTable,
   timestamp,
@@ -19,6 +20,8 @@ export const soMedicines = pgTable(
       length: 100,
     }).notNull(),
     inventoryUnit: varchar('inventory_unit', { length: 100 }).notNull(),
+    /** Vencimiento del lote / ítem (opcional). */
+    expirationDate: date('expiration_date'),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

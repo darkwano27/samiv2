@@ -134,6 +134,7 @@ export class ConsultationsService {
       concentration: body.concentration,
       administrationRoute: body.administrationRoute,
       inventoryUnit: body.inventoryUnit,
+      expirationDate: body.expirationDate,
     });
     if (!row) {
       throw new ConflictException({ message: 'No se pudo crear el medicamento' });
@@ -248,9 +249,7 @@ export class ConsultationsService {
       reason: reasonText,
       attentionLabel,
       dischargeLabel,
-      preamble: patientTo
-        ? 'Notificación de atención médica de tópico. No se adjunta PDF; el paciente recibe el comprobante completo por correo directo.'
-        : 'Notificación de atención médica de tópico. No se adjunta PDF (no hay correo del paciente para envío de ficha).',
+      preamble: 'Le informamos el siguiente registro de atención en tópico.',
     });
 
     let professionalSignatureDataUrl: string | undefined;
@@ -394,6 +393,7 @@ export class ConsultationsService {
       'cent_costo',
       'fech_ingreso',
       'fecha_atencion',
+      'atendido_por',
       'diagnostico',
       'farmaco',
       'cantidad',
@@ -421,6 +421,7 @@ export class ConsultationsService {
           esc(c.patientCostCenter ?? ''),
           esc(c.patientHireDate ?? ''),
           esc(fecha),
+          esc(r.attendedByLabel),
           esc(r.diagnosisText),
           esc(r.medicineName),
           esc(r.quantity ?? ''),

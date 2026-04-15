@@ -190,14 +190,54 @@ export class SoReportsRepository {
     return rows.map((r) => ({ condition: r.condition, n: Number(r.n) }));
   }
 
-  async countDerivados(range: SoReportDateRange): Promise<number> {
+  async countConsultationsByDischargeCondition(
+    range: SoReportDateRange,
+    condition: 'derivado' | 'observacion' | 'recuperado',
+  ): Promise<number> {
     const [row] = await this.db
       .select({ n: count() })
       .from(soConsultations)
       .where(
-        and(this.rangeWhere(range), eq(soConsultations.dischargeCondition, 'derivado')),
+        and(this.rangeWhere(range), eq(soConsultations.dischargeCondition, condition)),
       );
     return Number(row?.n ?? 0);
+  }
+
+  /** Atenciones por mes y sede (snapshot `patient_establ`), misma ventana que tendencia mensual. */
+  async monthlyConsultationsByEstablishment(params: {
+    anchor: Date;
+    months: number;
+    division?: string;
+    subdivision?: string;
+  }): Promise<{ month: string; establishment: string; n: number }[]> {
+    const { anchor, months, division, subdivision } = params;
+    const start = new Date(
+      Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - (months - 1), 1),
+    );
+    const end = new Date(
+      Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() + 1, 0, 23, 59, 59, 999),
+    );
+    const range: SoReportDateRange = { from: start, to: end, division, subdivision };
+
+    const rows = await this.db
+      .select({
+        month: sql<string>`TO_CHAR(${soConsultations.attentionDate} AT TIME ZONE 'UTC', 'YYYY-MM')`,
+        establishment: sql<string>`COALESCE(NULLIF(TRIM(${soConsultations.patientEstabl}), ''), 'Sin sede')`,
+        n: count(),
+      })
+      .from(soConsultations)
+      .where(this.rangeWhere(range))
+      .groupBy(
+        sql`TO_CHAR(${soConsultations.attentionDate} AT TIME ZONE 'UTC', 'YYYY-MM')`,
+        sql`COALESCE(NULLIF(TRIM(${soConsultations.patientEstabl}), ''), 'Sin sede')`,
+      )
+      .orderBy(asc(sql`TO_CHAR(${soConsultations.attentionDate} AT TIME ZONE 'UTC', 'YYYY-MM')`));
+
+    return rows.map((r) => ({
+      month: r.month,
+      establishment: r.establishment,
+      n: Number(r.n),
+    }));
   }
 
   async topDiagnoses(
@@ -343,6 +383,243 @@ export class SoReportsRepository {
     return keys.map((month) => ({
       month,
       ...byMonth.get(month)!,
+    }));
+  }
+
+  private utcMondayStart(d: Date): Date {
+    const y = d.getUTCFullYear();
+    const m = d.getUTCMonth();
+    const day = d.getUTCDate();
+    const dow = new Date(Date.UTC(y, m, day)).getUTCDay();
+    const daysFromMon = (dow + 6) % 7;
+    return new Date(Date.UTC(y, m, day - daysFromMon));
+  }
+
+  private formatUtcYmd(d: Date): string {
+    const y = d.getUTCFullYear();
+    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const da = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${mo}-${da}`;
+  }
+
+  /** Rango [lunes 00:00 UTC … domingo 23:59:59.999 UTC] de la semana que contiene `anchor`, y `weeks` semanas hacia atrás desde esa semana (incl.). */
+  private weekTrendDateRange(
+    anchor: Date,
+    weeks: number,
+    division?: string,
+    subdivision?: string,
+  ): { range: SoReportDateRange; weekKeys: string[]; anchorMonday: Date } {
+    const anchorMonday = this.utcMondayStart(anchor);
+    const windowStart = new Date(anchorMonday);
+    windowStart.setUTCDate(windowStart.getUTCDate() - (weeks - 1) * 7);
+    const windowEnd = new Date(anchorMonday.getTime() + 7 * 86400000 - 1);
+    const range: SoReportDateRange = {
+      from: windowStart,
+      to: windowEnd,
+      division,
+      subdivision,
+    };
+    const weekKeys: string[] = [];
+    for (let i = 0; i < weeks; i++) {
+      const d = new Date(anchorMonday);
+      d.setUTCDate(d.getUTCDate() - (weeks - 1 - i) * 7);
+      weekKeys.push(this.formatUtcYmd(d));
+    }
+    return { range, weekKeys, anchorMonday };
+  }
+
+  /**
+   * Tendencia semanal: total y desglose por condición al alta (lunes UTC = inicio de semana).
+   */
+  async weeklyDischargeTrend(params: {
+    anchor: Date;
+    weeks: number;
+    division?: string;
+    subdivision?: string;
+  }): Promise<
+    {
+      week: string;
+      total: number;
+      recuperado: number;
+      observacion: number;
+      derivado: number;
+    }[]
+  > {
+    const { anchor, weeks, division, subdivision } = params;
+    const { range, weekKeys } = this.weekTrendDateRange(
+      anchor,
+      weeks,
+      division,
+      subdivision,
+    );
+
+    const weekSql = sql<string>`to_char(
+      (date_trunc('week', ${soConsultations.attentionDate} AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')::date,
+      'YYYY-MM-DD'
+    )`;
+
+    const rows = await this.db
+      .select({
+        week: weekSql,
+        condition: soConsultations.dischargeCondition,
+        n: count(),
+      })
+      .from(soConsultations)
+      .where(this.rangeWhere(range))
+      .groupBy(weekSql, soConsultations.dischargeCondition)
+      .orderBy(asc(weekSql));
+
+    const byWeek = new Map<
+      string,
+      { total: number; recuperado: number; observacion: number; derivado: number }
+    >();
+
+    for (const r of rows) {
+      const w = r.week;
+      if (!byWeek.has(w)) {
+        byWeek.set(w, {
+          total: 0,
+          recuperado: 0,
+          observacion: 0,
+          derivado: 0,
+        });
+      }
+      const bucket = byWeek.get(w)!;
+      const c = Number(r.n);
+      bucket.total += c;
+      if (r.condition === 'recuperado') bucket.recuperado += c;
+      else if (r.condition === 'observacion') bucket.observacion += c;
+      else if (r.condition === 'derivado') bucket.derivado += c;
+    }
+
+    return weekKeys.map((week) => ({
+      week,
+      ...(byWeek.get(week) ?? {
+        total: 0,
+        recuperado: 0,
+        observacion: 0,
+        derivado: 0,
+      }),
+    }));
+  }
+
+  /** Atenciones por semana (lunes inicio) y sede, misma ventana que tendencia semanal. */
+  async weeklyConsultationsByEstablishment(params: {
+    anchor: Date;
+    weeks: number;
+    division?: string;
+    subdivision?: string;
+  }): Promise<{ week: string; establishment: string; n: number }[]> {
+    const { anchor, weeks, division, subdivision } = params;
+    const { range } = this.weekTrendDateRange(anchor, weeks, division, subdivision);
+
+    const weekSql = sql<string>`to_char(
+      (date_trunc('week', ${soConsultations.attentionDate} AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')::date,
+      'YYYY-MM-DD'
+    )`;
+
+    const rows = await this.db
+      .select({
+        week: weekSql,
+        establishment: sql<string>`COALESCE(NULLIF(TRIM(${soConsultations.patientEstabl}), ''), 'Sin sede')`,
+        n: count(),
+      })
+      .from(soConsultations)
+      .where(this.rangeWhere(range))
+      .groupBy(weekSql, sql`COALESCE(NULLIF(TRIM(${soConsultations.patientEstabl}), ''), 'Sin sede')`)
+      .orderBy(asc(weekSql));
+
+    return rows.map((r) => ({
+      week: r.week,
+      establishment: r.establishment,
+      n: Number(r.n),
+    }));
+  }
+
+  async weeklyByDivisionLabels(params: {
+    anchor: Date;
+    weeks: number;
+    division?: string;
+    subdivision?: string;
+  }): Promise<
+    { week: string; divisionLabel: string; consultationsCount: number }[]
+  > {
+    const { anchor, weeks, division, subdivision } = params;
+    const { range } = this.weekTrendDateRange(anchor, weeks, division, subdivision);
+
+    const weekSql = sql<string>`to_char(
+      (date_trunc('week', ${soConsultations.attentionDate} AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')::date,
+      'YYYY-MM-DD'
+    )`;
+
+    const rows = await this.db
+      .select({
+        week: weekSql,
+        divisionLabel: sql<string>`COALESCE(NULLIF(TRIM(${soConsultations.patientDivision}), ''), 'Sin división')`,
+        n: count(),
+      })
+      .from(soConsultations)
+      .where(this.rangeWhere(range))
+      .groupBy(
+        weekSql,
+        sql`COALESCE(NULLIF(TRIM(${soConsultations.patientDivision}), ''), 'Sin división')`,
+      )
+      .orderBy(asc(weekSql));
+
+    return rows.map((r) => ({
+      week: r.week,
+      divisionLabel: r.divisionLabel,
+      consultationsCount: Number(r.n),
+    }));
+  }
+
+  async weeklyDiagnosisCountsForIds(params: {
+    anchor: Date;
+    weeks: number;
+    diagnosisIds: string[];
+    rangeForTop: SoReportDateRange;
+  }): Promise<
+    { week: string; diagnosisId: string; name: string; cieCode: string | null; n: number }[]
+  > {
+    const { anchor, weeks, diagnosisIds, rangeForTop } = params;
+    if (diagnosisIds.length === 0) return [];
+
+    const { range } = this.weekTrendDateRange(
+      anchor,
+      weeks,
+      rangeForTop.division,
+      rangeForTop.subdivision,
+    );
+
+    const weekSql = sql<string>`to_char(
+      (date_trunc('week', ${soConsultations.attentionDate} AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')::date,
+      'YYYY-MM-DD'
+    )`;
+
+    const rows = await this.db
+      .select({
+        week: weekSql,
+        diagnosisId: soDiagnoses.id,
+        name: soDiagnoses.name,
+        cieCode: soDiagnoses.code,
+        n: count(),
+      })
+      .from(soConsultationDiagnoses)
+      .innerJoin(
+        soConsultations,
+        eq(soConsultationDiagnoses.consultationId, soConsultations.id),
+      )
+      .innerJoin(soDiagnoses, eq(soConsultationDiagnoses.diagnosisId, soDiagnoses.id))
+      .where(and(this.rangeWhere(range), inArray(soDiagnoses.id, diagnosisIds)))
+      .groupBy(weekSql, soDiagnoses.id, soDiagnoses.name, soDiagnoses.code)
+      .orderBy(asc(weekSql));
+
+    return rows.map((r) => ({
+      week: r.week,
+      diagnosisId: r.diagnosisId,
+      name: r.name,
+      cieCode: r.cieCode ?? null,
+      n: Number(r.n),
     }));
   }
 

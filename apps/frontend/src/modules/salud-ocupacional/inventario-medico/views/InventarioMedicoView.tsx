@@ -34,6 +34,20 @@ import {
 const selectClass =
   'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50';
 
+function fmtVencimiento(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = iso.slice(0, 10);
+  const [y, m, day] = d.split('-').map(Number);
+  if (!y || !m || !day) return '—';
+  try {
+    return new Intl.DateTimeFormat('es-PE', { dateStyle: 'medium' }).format(
+      new Date(y, m - 1, day),
+    );
+  } catch {
+    return d;
+  }
+}
+
 function ActiveBadge({ active }: { active: boolean }) {
   return (
     <span
@@ -533,6 +547,7 @@ function MedicinesPanel() {
           r.concentration,
           r.administrationRoute,
           r.inventoryUnit,
+          r.expirationDate ?? '',
         ]
           .join(' ')
           .toLowerCase()
@@ -552,6 +567,14 @@ function MedicinesPanel() {
       medColHelper.accessor('concentration', { header: 'Concentración' }),
       medColHelper.accessor('administrationRoute', { header: 'Vía' }),
       medColHelper.accessor('inventoryUnit', { header: 'Unidad' }),
+      medColHelper.accessor('expirationDate', {
+        header: 'Vencimiento',
+        cell: (c) => (
+          <span className="whitespace-nowrap text-muted-foreground">
+            {fmtVencimiento(c.getValue())}
+          </span>
+        ),
+      }),
       medColHelper.accessor('isActive', {
         header: 'Estado',
         cell: (c) => <ActiveBadge active={c.getValue()} />,
@@ -687,7 +710,7 @@ function MedicinesPanel() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1020px] text-left text-sm">
           <thead className="border-b bg-muted/40">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
@@ -718,13 +741,13 @@ function MedicinesPanel() {
           <tbody>
             {q.isLoading ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                   Cargando…
                 </td>
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">
                   {medEmptyHint}
                 </td>
               </tr>
@@ -751,7 +774,18 @@ function MedicinesPanel() {
           busy={createM.isPending}
           error={formErr}
           onClose={() => !createM.isPending && setAddOpen(false)}
-          onSubmit={(payload) => createM.mutate(payload)}
+          onSubmit={(payload) =>
+            createM.mutate({
+              name: payload.name,
+              presentation: payload.presentation,
+              concentration: payload.concentration,
+              administrationRoute: payload.administrationRoute,
+              inventoryUnit: payload.inventoryUnit,
+              ...(typeof payload.expirationDate === 'string' && payload.expirationDate
+                ? { expirationDate: payload.expirationDate }
+                : {}),
+            })
+          }
         />
       ) : null}
 
@@ -767,7 +801,14 @@ function MedicinesPanel() {
           onSubmit={(payload) =>
             patchM.mutate({
               id: edit.id,
-              body: payload,
+              body: {
+                name: payload.name,
+                presentation: payload.presentation,
+                concentration: payload.concentration,
+                administrationRoute: payload.administrationRoute,
+                inventoryUnit: payload.inventoryUnit,
+                expirationDate: payload.expirationDate ?? null,
+              },
             })
           }
         />
@@ -782,6 +823,8 @@ type MedFormPayload = {
   concentration: string;
   administrationRoute: (typeof SO_MEDICINE_ADMIN_ROUTES)[number];
   inventoryUnit: (typeof SO_MEDICINE_INVENTORY_UNITS)[number];
+  /** Alta: ausente o cadena. Edición: cadena o `null` para borrar. */
+  expirationDate?: string | null;
 };
 
 function MedicineFormModal({
@@ -812,7 +855,19 @@ function MedicineFormModal({
   const [inventoryUnit, setInventoryUnit] = useState<string>(
     initial?.inventoryUnit ?? SO_MEDICINE_INVENTORY_UNITS[0],
   );
+  const [expirationDate, setExpirationDate] = useState(
+    () => initial?.expirationDate?.slice(0, 10) ?? '',
+  );
   const [localErr, setLocalErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(initial?.name ?? '');
+    setConcentration(initial?.concentration ?? '');
+    setPresentation(initial?.presentation ?? SO_MEDICINE_PRESENTATIONS[0]);
+    setAdministrationRoute(initial?.administrationRoute ?? SO_MEDICINE_ADMIN_ROUTES[0]);
+    setInventoryUnit(initial?.inventoryUnit ?? SO_MEDICINE_INVENTORY_UNITS[0]);
+    setExpirationDate(initial?.expirationDate?.slice(0, 10) ?? '');
+  }, [initial]);
 
   function submit() {
     const n = name.trim();
@@ -822,13 +877,22 @@ function MedicineFormModal({
       return;
     }
     setLocalErr(null);
-    onSubmit({
+    const exp = expirationDate.trim();
+    const base: MedFormPayload = {
       name: n,
       concentration: c,
       presentation: presentation as MedFormPayload['presentation'],
       administrationRoute: administrationRoute as MedFormPayload['administrationRoute'],
       inventoryUnit: inventoryUnit as MedFormPayload['inventoryUnit'],
-    });
+    };
+    if (initial) {
+      onSubmit({
+        ...base,
+        expirationDate: exp === '' ? null : exp,
+      });
+    } else {
+      onSubmit(exp === '' ? base : { ...base, expirationDate: exp });
+    }
   }
 
   return (
@@ -910,6 +974,19 @@ function MedicineFormModal({
                 </option>
               ))}
             </select>
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="inv-med-exp">Fecha de vencimiento</Label>
+            <Input
+              id="inv-med-exp"
+              type="date"
+              value={expirationDate}
+              onChange={(e) => setExpirationDate(e.target.value)}
+              disabled={busy}
+            />
+            <p className="text-xs text-muted-foreground">
+              Opcional. Podés dejarlo vacío o borrarlo al editar.
+            </p>
           </div>
         </div>
         {localErr || error ? (

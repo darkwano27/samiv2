@@ -1,10 +1,11 @@
-/** Respuesta SAP para búsqueda de paciente (backend camelCase). */
+/** Trabajador desde maestro / réplica (backend camelCase). */
 export type SoSapWorker = {
   cod: string;
+  /** Nombres + apellidos (incluye materno si viene en `name2`). */
   name: string;
-  /** Sede (SAP `sede`). */
+  /** Sede (`sede`). */
   sede: string | null;
-  /** Cargo / puesto (SAP `stext`). */
+  /** Cargo / puesto (`stext`). */
   jobTitle: string | null;
   /** Compat.: cargo o fallback; usar con `sede`. */
   position: string | null;

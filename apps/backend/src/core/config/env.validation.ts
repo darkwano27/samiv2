@@ -32,6 +32,20 @@ export const envSchema = z.object({
    * Ejemplo: (&(objectClass=user)(objectCategory=person)(postalCode={sapCode}))
    */
   LDAP_AUTH_FILTER: z.string().optional(),
+  /**
+   * Si es false: no se usa AD/LDAP en login ni identify; solo local / new-local.
+   * Útil cuando SAP trae `correo_corp` poblado pero no hay directorio real (p. ej. dev).
+   */
+  LDAP_AD_AUTH_ENABLED: boolEnv(true),
+  /**
+   * Cómo localizar la cuenta AD al hacer login corporativo:
+   * - `corporate_mail`: buscar por mail/UPN = `correo_corp` en SAP (varios pernr pueden compartir cuenta).
+   * - `sap_code`: solo `postalCode` (o LDAP_AUTH_FILTER) = pernr (1:1).
+   * - `corporate_mail_then_sap_code`: primero por correo; si no hay usuario, intenta por pernr.
+   */
+  LDAP_AD_AUTH_STRATEGY: z
+    .enum(['corporate_mail', 'sap_code', 'corporate_mail_then_sap_code'])
+    .default('corporate_mail_then_sap_code'),
   EMAIL_ENABLED: boolEnv(false),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().optional(),

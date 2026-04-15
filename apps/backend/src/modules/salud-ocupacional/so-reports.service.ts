@@ -48,10 +48,23 @@ function previousRange(range: SoReportDateRange): SoReportDateRange {
   return { ...range, from: prevFrom, to: prevTo };
 }
 
-/** AR10, AR20, … si aparece en el texto de división SAP. */
+/** AR10, AR20, … si aparece en el texto de división (snapshot). */
 function divisionSapHint(label: string): string | undefined {
   const m = label.match(/\b(AR\d{2})\b/);
   return m?.[1];
+}
+
+/** Agrupa textos de sede del snapshot hacia etiquetas de reporte. */
+function formatEstablishmentLabel(raw: string): string {
+  const t = raw.trim();
+  if (!t || t === 'Sin sede') return 'Sin sede';
+  const f = t
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase();
+  if (f.includes('lurin')) return 'Lurín';
+  if (f.includes('lima')) return 'Aris Lima';
+  return t;
 }
 
 @Injectable()
@@ -70,21 +83,21 @@ export class SoReportsService {
       totalConsultationsPrev,
       uniqueWorkers,
       reincidentWorkers,
-      derivados,
+      inObservation,
       totalActiveWorkers,
     ] = await Promise.all([
       this.repo.countConsultations(range),
       this.repo.countConsultations(prev),
       this.repo.countDistinctPatients(range),
       this.repo.countReincidentPatients(range),
-      this.repo.countDerivados(range),
+      this.repo.countConsultationsByDischargeCondition(range, 'observacion'),
       this.repo.countActiveSapWorkers(range.division, range.subdivision),
     ]);
 
     const reincidentRate =
       uniqueWorkers > 0 ? reincidentWorkers / uniqueWorkers : 0;
-    const externalReferralRate =
-      totalConsultations > 0 ? derivados / totalConsultations : 0;
+    const inObservationRate =
+      totalConsultations > 0 ? inObservation / totalConsultations : 0;
 
     return {
       totalConsultations,
@@ -93,8 +106,8 @@ export class SoReportsService {
       totalActiveWorkers,
       reincidentWorkers,
       reincidentRate,
-      externalReferrals: derivados,
-      externalReferralRate,
+      inObservationCount: inObservation,
+      inObservationRate,
     };
   }
 
@@ -162,31 +175,37 @@ export class SoReportsService {
     return { patients };
   }
 
-  async getTrend(q: SoReportFiltersQuery & { months?: number }) {
+  async getTrend(q: SoReportFiltersQuery & { weeks?: number }) {
     const range = resolveSoReportRange(q);
-    const months = q.months ?? 12;
+    const weeks = q.weeks ?? 16;
     const anchor = range.to;
 
-    const [monthly, rawDiv, topDiagMeta] = await Promise.all([
-      this.repo.monthlyDischargeTrend({
+    const [weekly, rawDiv, topDiagMeta, estabRows] = await Promise.all([
+      this.repo.weeklyDischargeTrend({
         anchor,
-        months,
+        weeks,
         division: range.division,
         subdivision: range.subdivision,
       }),
-      this.repo.monthlyByDivisionLabels({
+      this.repo.weeklyByDivisionLabels({
         anchor,
-        months,
+        weeks,
         division: range.division,
         subdivision: range.subdivision,
       }),
       this.repo.topDiagnosisIdsWithMeta(range, 5),
+      this.repo.weeklyConsultationsByEstablishment({
+        anchor,
+        weeks,
+        division: range.division,
+        subdivision: range.subdivision,
+      }),
     ]);
 
     const diagnosisIds = topDiagMeta.map((d) => d.id);
-    const diagRows = await this.repo.monthlyDiagnosisCountsForIds({
+    const diagRows = await this.repo.weeklyDiagnosisCountsForIds({
       anchor,
-      months,
+      weeks,
       diagnosisIds,
       rangeForTop: range,
     });
@@ -213,8 +232,8 @@ export class SoReportsService {
       const wc = Math.max(1, workersByLabel.get(r.divisionLabel) ?? 1);
       const ratePer100 = (r.consultationsCount / wc) * 100;
       const code = divisionSapHint(r.divisionLabel) ?? r.divisionLabel;
-      if (!byDivisionMap.has(r.month)) byDivisionMap.set(r.month, []);
-      byDivisionMap.get(r.month)!.push({
+      if (!byDivisionMap.has(r.week)) byDivisionMap.set(r.week, []);
+      byDivisionMap.get(r.week)!.push({
         code,
         count: r.consultationsCount,
         workersCount: wc,
@@ -224,7 +243,7 @@ export class SoReportsService {
 
     const byDivision = [...byDivisionMap.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, divisions]) => ({ month, divisions }));
+      .map(([week, divisions]) => ({ week, divisions }));
 
     const byDiagMap = new Map<
       string,
@@ -232,8 +251,8 @@ export class SoReportsService {
     >();
 
     for (const r of diagRows) {
-      if (!byDiagMap.has(r.month)) byDiagMap.set(r.month, []);
-      byDiagMap.get(r.month)!.push({
+      if (!byDiagMap.has(r.week)) byDiagMap.set(r.week, []);
+      byDiagMap.get(r.week)!.push({
         cieCode: r.cieCode,
         name: r.name,
         count: r.n,
@@ -242,10 +261,28 @@ export class SoReportsService {
 
     const byDiagnosis = [...byDiagMap.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, diagnoses]) => ({ month, diagnoses }));
+      .map(([week, diagnoses]) => ({ week, diagnoses }));
+
+    const estabByWeek = new Map<string, Map<string, number>>();
+    for (const r of estabRows) {
+      const label = formatEstablishmentLabel(r.establishment);
+      if (!estabByWeek.has(r.week)) estabByWeek.set(r.week, new Map());
+      const m = estabByWeek.get(r.week)!;
+      m.set(label, (m.get(label) ?? 0) + r.n);
+    }
+
+    const weeklyWithEstab = weekly.map((row) => {
+      const inner = estabByWeek.get(row.week);
+      const establishments = inner
+        ? [...inner.entries()]
+            .map(([label, count]) => ({ label, count }))
+            .sort((a, b) => b.count - a.count)
+        : [];
+      return { ...row, establishments };
+    });
 
     return {
-      monthly,
+      weekly: weeklyWithEstab,
       byDivision,
       byDiagnosis,
       topDiagnoses: topDiagMeta.map((d) => ({
@@ -267,7 +304,7 @@ export class SoReportsService {
         this.getByDivision(q),
         this.getTopMedications({ ...q, limit: 10 }),
         this.getTopPatients({ ...q, limit: 10 }),
-        this.getTrend({ ...q, months: 12 }),
+        this.getTrend({ ...q, weeks: 16 }),
       ]);
 
     const periodLabel = `${range.from.toISOString().slice(0, 10)} — ${range.to.toISOString().slice(0, 10)}`;
@@ -292,7 +329,7 @@ export class SoReportsService {
       },
       { label: 'Trabajadores atendidos (distintos)', value: String(summary.uniqueWorkers) },
       {
-        label: 'Trabajadores activos SAP (aprox.)',
+        label: 'Trabajadores activos (referencia)',
         value: String(summary.totalActiveWorkers),
       },
       {
@@ -300,8 +337,8 @@ export class SoReportsService {
         value: `${(summary.reincidentRate * 100).toFixed(1)}%`,
       },
       {
-        label: 'Derivaciones / tasa',
-        value: `${summary.externalReferrals} (${(summary.externalReferralRate * 100).toFixed(1)}%)`,
+        label: 'En observación / tasa',
+        value: `${summary.inObservationCount} (${(summary.inObservationRate * 100).toFixed(1)}%)`,
       },
     ];
 
@@ -332,12 +369,12 @@ export class SoReportsService {
       String(m.totalUnits),
     ]);
 
-    const trendRows = trend.monthly.map((m) => [
-      m.month,
-      String(m.total),
-      String(m.recuperado),
-      String(m.observacion),
-      String(m.derivado),
+    const trendRows = trend.weekly.map((w) => [
+      w.week,
+      String(w.total),
+      String(w.recuperado),
+      String(w.observacion),
+      String(w.derivado),
     ]);
 
     const payload: SoReportPdfPayload = {
@@ -362,7 +399,7 @@ export class SoReportsService {
         },
         {
           title: 'Atenciones por división',
-          headers: ['Código', 'División', 'Workers SAP', 'Atenciones'],
+          headers: ['Código', 'División', 'Trabajadores activos', 'Atenciones'],
           rows: divRows,
         },
         {
@@ -371,8 +408,8 @@ export class SoReportsService {
           rows: medRows,
         },
         {
-          title: 'Tendencia mensual (últimos 12 meses hacia fin de periodo)',
-          headers: ['Mes', 'Total', 'Recuperado', 'Observación', 'Derivado'],
+          title: 'Tendencia semanal (semanas hacia fin de periodo; inicio lunes)',
+          headers: ['Semana (inicio)', 'Total', 'Recuperado', 'Observación', 'Derivado'],
           rows: trendRows,
         },
       ],

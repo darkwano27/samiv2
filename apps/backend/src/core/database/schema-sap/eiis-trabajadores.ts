@@ -18,6 +18,8 @@ export const eiisTrabajadores = pgTable('eiis_trabajadores', {
   btrtl: varchar('btrtl', { length: 20 }),
   nachn: text('nachn'),
   vorna: text('vorna'),
+  /** Segundo apellido / apellido materno (SAP), cuando viene en la réplica. */
+  name2: text('name2'),
   /** DNI / documento en maestro */
   perid: varchar('perid', { length: 32 }),
   /** Correo personal (temp password, registro) */

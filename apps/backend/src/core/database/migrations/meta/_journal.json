@@ -176,6 +176,20 @@
       "when": 1776700000000,
       "tag": "0024_he_boleta_approved_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1776800000000,
+      "tag": "0025_eiis_trabajadores_name2",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776900000000,
+      "tag": "0026_so_medicines_expiration_date",
+      "breakpoints": true
     }
   ]
 }

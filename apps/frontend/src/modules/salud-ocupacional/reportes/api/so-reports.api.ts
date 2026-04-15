@@ -57,12 +57,12 @@ export const soReportsApi = {
       })
       .json(),
 
-  trend: (p: SoReportQueryParams & { months?: number }) =>
+  trend: (p: SoReportQueryParams & { weeks?: number }) =>
     httpClient
       .get(`${BASE}/trend`, {
         searchParams: {
           ...toSearchParams(p),
-          ...(p.months ? { months: String(p.months) } : {}),
+          ...(p.weeks != null ? { weeks: String(p.weeks) } : {}),
         },
       })
       .json(),

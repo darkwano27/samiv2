@@ -44,7 +44,7 @@ export function StepPasswordAD({
   return (
     <AuthCard
       title="Ingresa tu contraseña"
-      subtitle={`Hola ${workerName} Usa la contraseña de tu correo corporativo.`}
+      subtitle={`Hola ${workerName} Usá la contraseña de la cuenta de correo corporativo.`}
       belowHeader={<BackButton onBack={onBack} />}
     >
       <form onSubmit={submit} className="flex flex-col gap-4">

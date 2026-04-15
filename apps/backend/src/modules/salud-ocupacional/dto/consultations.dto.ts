@@ -58,12 +58,15 @@ export const createDiagnosisBodySchema = z.object({
   code: z.string().max(20).optional(),
 });
 
+const isoDateOnly = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
 export const createMedicineBodySchema = z.object({
   name: z.string().min(1).max(200),
   presentation: z.enum(PRESENTATIONS),
   concentration: z.string().min(1).max(100),
   administrationRoute: z.enum(ADMIN_ROUTES),
   inventoryUnit: z.enum(INVENTORY_UNITS),
+  expirationDate: isoDateOnly.optional(),
 });
 
 const prescriptionItemSchema = z.object({
@@ -107,6 +110,8 @@ export const historialQuerySchema = z.object({
   search: z.string().optional(),
   division: z.string().max(200).optional(),
   subdivision: z.string().max(200).optional(),
+  /** `workers.id` (= SAP quien registró la consulta). */
+  attendedBy: z.string().max(32).optional(),
   /** ISO 8601 recomendado; se parsea con `new Date()`. */
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
@@ -144,6 +149,7 @@ export const updateMedicineBodySchema = z
     concentration: z.string().min(1).max(100).optional(),
     administrationRoute: z.enum(ADMIN_ROUTES).optional(),
     inventoryUnit: z.enum(INVENTORY_UNITS).optional(),
+    expirationDate: z.union([isoDateOnly, z.null()]).optional(),
     isActive: z.boolean().optional(),
   })
   .refine(
@@ -153,6 +159,7 @@ export const updateMedicineBodySchema = z
       o.concentration !== undefined ||
       o.administrationRoute !== undefined ||
       o.inventoryUnit !== undefined ||
+      o.expirationDate !== undefined ||
       o.isActive !== undefined,
     { message: 'Se requiere al menos un campo' },
   );

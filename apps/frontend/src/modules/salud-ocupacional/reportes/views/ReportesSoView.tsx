@@ -1,4 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   CartesianGrid,
   Legend,
@@ -34,6 +36,95 @@ const DISCHARGE_LABELS: Record<string, string> = {
 
 const STALE = 5 * 60 * 1000;
 
+const TREND_VISIBLE_WEEKS = 10;
+
+type TrendChartRow = {
+  weekKey: string;
+  weekLabel: string;
+  weekLabelLong: string;
+  Total: number;
+  Recuperado: number;
+  Observación: number;
+  Derivado: number;
+  establishments: { label: string; count: number }[];
+};
+
+/** `weekStart` = lunes en `YYYY-MM-DD` (UTC). Etiqueta corta para el eje (menos saturación). */
+function formatWeekAxis(weekStart: string): string {
+  const [y, mo, d] = weekStart.split('-').map(Number);
+  if (!y || !mo || !d) return weekStart;
+  const start = new Date(Date.UTC(y, mo - 1, d));
+  const nowY = new Date().getFullYear();
+  return start.toLocaleDateString(
+    'es-PE',
+    start.getUTCFullYear() !== nowY
+      ? { day: 'numeric', month: 'short', year: 'numeric' }
+      : { day: 'numeric', month: 'short' },
+  );
+}
+
+function formatWeekLong(weekStart: string): string {
+  const [y, mo, d] = weekStart.split('-').map(Number);
+  if (!y || !mo || !d) return weekStart;
+  const start = new Date(Date.UTC(y, mo - 1, d));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  const a = start.toLocaleDateString('es-PE', { dateStyle: 'long' });
+  const b = end.toLocaleDateString('es-PE', { dateStyle: 'long' });
+  return `${a} – ${b}`;
+}
+
+function pctPart(n: number, total: number): string {
+  if (total <= 0) return '—';
+  return `${((n / total) * 100).toFixed(1)}%`;
+}
+
+function SoTrendTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: { payload: TrendChartRow }[];
+}) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0].payload;
+  const t = row.Total;
+  const line = (label: string, n: number) => (
+    <p key={label}>
+      <span className="text-muted-foreground">{label}:</span>{' '}
+      <span className="font-medium tabular-nums">{n}</span>
+      {t > 0 ? (
+        <span className="text-muted-foreground"> ({pctPart(n, t)} de la semana)</span>
+      ) : null}
+    </p>
+  );
+  return (
+    <div className="border-border bg-background max-w-xs rounded-md border px-3 py-2 text-xs shadow-md">
+      <p className="mb-1.5 font-medium capitalize">{row.weekLabelLong}</p>
+      {line('Total', row.Total)}
+      {line('Recuperado', row.Recuperado)}
+      {line('En observación', row.Observación)}
+      {line('Derivado', row.Derivado)}
+      {row.establishments.length > 0 ? (
+        <div className="border-border/80 mt-2 border-t pt-2">
+          <p className="text-muted-foreground mb-1 text-[11px] font-medium uppercase tracking-wide">
+            Sede
+          </p>
+          {row.establishments.map((e) => (
+            <p key={`${row.weekKey}-${e.label}`}>
+              <span className="text-muted-foreground">{e.label}:</span>{' '}
+              <span className="font-medium tabular-nums">{e.count}</span>
+              {t > 0 ? (
+                <span className="text-muted-foreground"> ({pctPart(e.count, t)} de la semana)</span>
+              ) : null}
+            </p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function ReportesSoView() {
   const filters = useSoReportFilters();
   const p = filters.params;
@@ -54,8 +145,8 @@ export function ReportesSoView() {
       totalActiveWorkers: number;
       reincidentWorkers: number;
       reincidentRate: number;
-      externalReferrals: number;
-      externalReferralRate: number;
+      inObservationCount: number;
+      inObservationRate: number;
     }>,
     staleTime: STALE,
   });
@@ -121,17 +212,52 @@ export function ReportesSoView() {
   const trendQ = useQuery({
     queryKey: ['so-reports', 'trend', p],
     queryFn: () =>
-      soReportsApi.trend({ ...p, months: 12 }) as Promise<{
-        monthly: {
-          month: string;
+      soReportsApi.trend({ ...p, weeks: 16 }) as Promise<{
+        weekly: {
+          week: string;
           total: number;
           recuperado: number;
           observacion: number;
           derivado: number;
+          establishments?: { label: string; count: number }[];
         }[];
       }>,
     staleTime: STALE,
   });
+
+  const [trendWindowStart, setTrendWindowStart] = useState(0);
+  const trendSeriesFull = useMemo((): TrendChartRow[] => {
+    return (
+      trendQ.data?.weekly.map((w) => ({
+        weekKey: w.week,
+        weekLabel: formatWeekAxis(w.week),
+        weekLabelLong: formatWeekLong(w.week),
+        Total: w.total,
+        Recuperado: w.recuperado,
+        Observación: w.observacion,
+        Derivado: w.derivado,
+        establishments: w.establishments ?? [],
+      })) ?? []
+    );
+  }, [trendQ.data]);
+
+  const trendMaxStart = Math.max(0, trendSeriesFull.length - TREND_VISIBLE_WEEKS);
+  const trendFilterKey = `${p.from ?? ''}|${p.to ?? ''}|${p.division ?? ''}|${p.subdivision ?? ''}`;
+  useEffect(() => {
+    setTrendWindowStart(0);
+  }, [trendFilterKey]);
+
+  useEffect(() => {
+    setTrendWindowStart((s) => Math.min(s, trendMaxStart));
+  }, [trendMaxStart]);
+
+  const trendWindowStartClamped = Math.min(trendWindowStart, trendMaxStart);
+  const chartData = useMemo(() => {
+    return trendSeriesFull.slice(
+      trendWindowStartClamped,
+      trendWindowStartClamped + TREND_VISIBLE_WEEKS,
+    );
+  }, [trendSeriesFull, trendWindowStartClamped]);
 
   const pdfMut = useMutation({
     mutationFn: () => soReportsApi.downloadPdf(p),
@@ -154,15 +280,6 @@ export function ReportesSoView() {
           100
         ).toFixed(1)
       : '—';
-
-  const chartData =
-    trendQ.data?.monthly.map((m) => ({
-      month: m.month.slice(5),
-      Total: m.total,
-      Recuperado: m.recuperado,
-      Observación: m.observacion,
-      Derivado: m.derivado,
-    })) ?? [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
@@ -281,9 +398,7 @@ export function ReportesSoView() {
           title="Trabajadores atendidos"
           value={summaryQ.isLoading ? '…' : String(summary?.uniqueWorkers ?? '—')}
           sub={
-            summary
-              ? `de ${summary.totalActiveWorkers} activos SAP (aprox.)`
-              : undefined
+            summary ? `de ${summary.totalActiveWorkers} activos` : undefined
           }
         />
         <Kpi
@@ -297,18 +412,18 @@ export function ReportesSoView() {
           }
           sub={
             summary
-              ? 'Pacientes que se atienden más de una vez en el periodo elegido, respecto del total de pacientes distintos.'
+              ? 'Pacientes que se atienden más de una vez en el periodo elegido.'
               : undefined
           }
         />
         <Kpi
-          title="Derivaciones"
+          title="En observación"
           value={
-            summaryQ.isLoading ? '…' : String(summary?.externalReferrals ?? '—')
+            summaryQ.isLoading ? '…' : String(summary?.inObservationCount ?? '—')
           }
           sub={
             summary
-              ? `${(summary.externalReferralRate * 100).toFixed(1)}% del total`
+              ? `${(summary.inObservationRate * 100).toFixed(1)}% del total de atenciones`
               : undefined
           }
         />
@@ -376,9 +491,6 @@ export function ReportesSoView() {
         <Card className="border-border shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Top pacientes</CardTitle>
-            <p className="text-muted-foreground text-xs">
-              Más atenciones registradas en el periodo (código SAP)
-            </p>
           </CardHeader>
           <CardContent>
             <table className="w-full text-sm">
@@ -427,7 +539,7 @@ export function ReportesSoView() {
                 <div key={d.divisionName}>
                   <div className="mb-1 flex justify-between text-xs">
                     <span>
-                      {d.divisionCode} · {d.workersCount} workers
+                      {d.divisionCode} · {d.workersCount} trabajadores
                     </span>
                     <span>{d.consultationsCount}</span>
                   </div>
@@ -471,44 +583,101 @@ export function ReportesSoView() {
       </div>
 
       <Card className="border-border shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Tendencia de atenciones</CardTitle>
-          <p className="text-muted-foreground text-xs">
-            Total mensual y desglose por condición al alta (últimos 12 meses)
-          </p>
+        <CardHeader className="flex flex-col gap-2 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="text-base">Tendencia de atenciones</CardTitle>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Total semanal y condición al alta (cada punto es una semana; lunes a domingo en UTC).
+              El cursor muestra cantidades, porcentajes respecto del total de esa semana y sede. Si
+              hay más de {TREND_VISIBLE_WEEKS} semanas, usá las flechas para correr la ventana.
+            </p>
+          </div>
+          {trendSeriesFull.length > TREND_VISIBLE_WEEKS ? (
+            <div className="flex shrink-0 items-center gap-1 self-end sm:self-start">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                disabled={trendWindowStartClamped <= 0}
+                aria-label="Ver semanas anteriores"
+                onClick={() =>
+                  setTrendWindowStart((s) => Math.max(0, s - 1))
+                }
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                disabled={trendWindowStartClamped >= trendMaxStart}
+                aria-label="Ver semanas siguientes"
+                onClick={() =>
+                  setTrendWindowStart((s) =>
+                    Math.min(
+                      Math.max(0, trendSeriesFull.length - TREND_VISIBLE_WEEKS),
+                      s + 1,
+                    ),
+                  )
+                }
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
         </CardHeader>
-        <CardContent className="h-[280px] w-full">
+        <CardContent className="h-[300px] w-full pb-1">
           {chartData.length === 0 ? (
             <p className="text-muted-foreground text-sm">Sin datos de tendencia.</p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="Total" stroke="#21a795" strokeWidth={2} dot={false} />
+                <XAxis
+                  dataKey="weekLabel"
+                  tick={{ fontSize: 10 }}
+                  minTickGap={28}
+                  interval="preserveStartEnd"
+                  angle={-28}
+                  textAnchor="end"
+                  height={48}
+                />
+                <YAxis tick={{ fontSize: 10 }} allowDecimals={false} width={36} />
+                <Tooltip content={<SoTrendTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line
+                  type="monotone"
+                  dataKey="Total"
+                  stroke="#21a795"
+                  strokeWidth={2}
+                  dot={{ r: 2.5, strokeWidth: 0 }}
+                  activeDot={{ r: 4 }}
+                />
                 <Line
                   type="monotone"
                   dataKey="Recuperado"
                   stroke="rgba(29,158,117,0.55)"
                   strokeWidth={1.5}
-                  dot={false}
+                  dot={{ r: 2, strokeWidth: 0 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="Observación"
                   stroke="#EF9F27"
                   strokeWidth={1.5}
-                  dot={false}
+                  dot={{ r: 2, strokeWidth: 0 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="Derivado"
                   stroke="#E24B4A"
                   strokeWidth={1.5}
-                  dot={false}
+                  dot={{ r: 2, strokeWidth: 0 }}
                 />
               </LineChart>
             </ResponsiveContainer>

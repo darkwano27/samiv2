@@ -22,6 +22,8 @@ export type SoInventarioMedicine = {
   concentration: string;
   administrationRoute: string;
   inventoryUnit: string;
+  /** ISO fecha (`YYYY-MM-DD`) o null. */
+  expirationDate: string | null;
   isActive: boolean;
   createdAt: string;
 };
@@ -47,6 +49,7 @@ export async function soInventarioCreateMedicine(body: {
   concentration: string;
   administrationRoute: SoMedicineAdminRoute;
   inventoryUnit: SoMedicineInventoryUnit;
+  expirationDate?: string;
 }): Promise<SoInventarioMedicine> {
   return httpClient.post(`${BASE}/medicines`, { json: body }).json<SoInventarioMedicine>();
 }
@@ -72,6 +75,7 @@ export async function soInventarioPatchMedicine(
     concentration?: string;
     administrationRoute?: SoMedicineAdminRoute;
     inventoryUnit?: SoMedicineInventoryUnit;
+    expirationDate?: string | null;
     isActive?: boolean;
   },
 ): Promise<SoInventarioMedicine> {

@@ -12,6 +12,7 @@ import {
   lte,
   ne,
   or,
+  sql,
 } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { SAMI_DB, SAP_DB } from '@core/database/database.module';
@@ -102,7 +103,14 @@ function mapEiisRowToSapWorker(
   isActive: boolean,
 ): SapWorkerRow {
   const name =
-    `${(w.vorna ?? '').trim()} ${(w.nachn ?? '').trim()}`.trim() || '—';
+    [
+      (w.vorna ?? '').trim(),
+      (w.nachn ?? '').trim(),
+      (w.name2 ?? '').trim(),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || '—';
   const sede = (w.sede ?? '').trim() || null;
   const jobTitle = (w.stext ?? '').trim() || null;
   const position =
@@ -180,8 +188,9 @@ export class ConsultationsRepository {
   async listHistorialFilterMeta(): Promise<{
     divisions: string[];
     subdivisions: string[];
+    attendants: { id: string; name: string }[];
   }> {
-    const [divRows, subRows] = await Promise.all([
+    const [divRows, subRows, attRows] = await Promise.all([
       this.db
         .selectDistinct({ v: soConsultations.patientDivision })
         .from(soConsultations)
@@ -190,6 +199,15 @@ export class ConsultationsRepository {
         .selectDistinct({ v: soConsultations.patientSubdivision })
         .from(soConsultations)
         .where(isNotNull(soConsultations.patientSubdivision)),
+      this.db
+        .selectDistinct({
+          id: soConsultations.createdBy,
+          name: sql<string>`COALESCE(${workers.name}, ${soConsultations.createdBy})`.as(
+            'att_name',
+          ),
+        })
+        .from(soConsultations)
+        .leftJoin(workers, eq(soConsultations.createdBy, workers.id)),
     ]);
     const divisions = [
       ...new Set(
@@ -205,7 +223,18 @@ export class ConsultationsRepository {
           .filter((s) => s.length > 0),
       ),
     ].sort((a, b) => a.localeCompare(b, 'es'));
-    return { divisions, subdivisions };
+    const seenAtt = new Set<string>();
+    const attendants: { id: string; name: string }[] = [];
+    for (const r of attRows) {
+      const id = (r.id ?? '').trim();
+      if (!id || seenAtt.has(id)) continue;
+      seenAtt.add(id);
+      attendants.push({ id, name: (r.name ?? id).trim() || id });
+    }
+    attendants.sort(
+      (a, b) => a.name.localeCompare(b.name, 'es') || a.id.localeCompare(b.id, 'es'),
+    );
+    return { divisions, subdivisions, attendants };
   }
 
   /** Un trabajador activo vigente por `pernr` exacto (trim). */
@@ -229,6 +258,7 @@ export class ConsultationsRepository {
           ilike(eiisTrabajadores.pernr, pattern),
           ilike(eiisTrabajadores.nachn, pattern),
           ilike(eiisTrabajadores.vorna, pattern),
+          ilike(eiisTrabajadores.name2, pattern),
           ilike(eiisTrabajadores.sede, pattern),
           ilike(eiisTrabajadores.txtDiv, pattern),
           ilike(eiisTrabajadores.txtSubdiv, pattern),
@@ -283,6 +313,7 @@ export class ConsultationsRepository {
         concentration: soMedicines.concentration,
         administrationRoute: soMedicines.administrationRoute,
         inventoryUnit: soMedicines.inventoryUnit,
+        expirationDate: soMedicines.expirationDate,
         isActive: soMedicines.isActive,
       })
       .from(soMedicines)
@@ -301,6 +332,7 @@ export class ConsultationsRepository {
         concentration: soMedicines.concentration,
         administrationRoute: soMedicines.administrationRoute,
         inventoryUnit: soMedicines.inventoryUnit,
+        expirationDate: soMedicines.expirationDate,
         isActive: soMedicines.isActive,
       })
       .from(soMedicines)
@@ -342,6 +374,7 @@ export class ConsultationsRepository {
     concentration: string;
     administrationRoute: string;
     inventoryUnit: string;
+    expirationDate?: string;
   }) {
     const [row] = await this.db
       .insert(soMedicines)
@@ -351,6 +384,9 @@ export class ConsultationsRepository {
         concentration: values.concentration,
         administrationRoute: values.administrationRoute,
         inventoryUnit: values.inventoryUnit,
+        ...(values.expirationDate
+          ? { expirationDate: values.expirationDate }
+          : {}),
       })
       .returning({
         id: soMedicines.id,
@@ -359,6 +395,7 @@ export class ConsultationsRepository {
         concentration: soMedicines.concentration,
         administrationRoute: soMedicines.administrationRoute,
         inventoryUnit: soMedicines.inventoryUnit,
+        expirationDate: soMedicines.expirationDate,
         isActive: soMedicines.isActive,
       });
     return row;
@@ -396,6 +433,7 @@ export class ConsultationsRepository {
         concentration: soMedicines.concentration,
         administrationRoute: soMedicines.administrationRoute,
         inventoryUnit: soMedicines.inventoryUnit,
+        expirationDate: soMedicines.expirationDate,
         isActive: soMedicines.isActive,
         createdAt: soMedicines.createdAt,
       })
@@ -466,6 +504,12 @@ export class ConsultationsRepository {
         ...(body.inventoryUnit !== undefined
           ? { inventoryUnit: body.inventoryUnit }
           : {}),
+        ...(body.expirationDate !== undefined
+          ? {
+              expirationDate:
+                body.expirationDate === null ? null : body.expirationDate,
+            }
+          : {}),
         ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
       })
       .where(eq(soMedicines.id, id))
@@ -476,6 +520,7 @@ export class ConsultationsRepository {
         concentration: soMedicines.concentration,
         administrationRoute: soMedicines.administrationRoute,
         inventoryUnit: soMedicines.inventoryUnit,
+        expirationDate: soMedicines.expirationDate,
         isActive: soMedicines.isActive,
         createdAt: soMedicines.createdAt,
       });
@@ -611,6 +656,9 @@ export class ConsultationsRepository {
     const offset = (page - 1) * limit;
     const cond = this.historialConditions(filters);
 
+    const attendedByNameCol = sql<string>`COALESCE(${workers.name}, ${soConsultations.createdBy})`.as(
+      'attended_by_name',
+    );
     const rows = await this.db
       .select({
         id: soConsultations.id,
@@ -625,8 +673,10 @@ export class ConsultationsRepository {
         reason: soConsultations.reason,
         dischargeCondition: soConsultations.dischargeCondition,
         createdAt: soConsultations.createdAt,
+        attendedByName: attendedByNameCol,
       })
       .from(soConsultations)
+      .leftJoin(workers, eq(soConsultations.createdBy, workers.id))
       .where(cond)
       .orderBy(desc(soConsultations.attentionDate))
       .limit(limit)
@@ -657,6 +707,10 @@ export class ConsultationsRepository {
       const p = `%${subdiv.replace(/%/g, '\\%')}%`;
       parts.push(ilike(soConsultations.patientSubdivision, p));
     }
+    const att = filters.attendedBy?.trim();
+    if (att && att.length >= 1) {
+      parts.push(eq(soConsultations.createdBy, att));
+    }
     if (filters.dateFrom) {
       parts.push(
         gte(soConsultations.attentionDate, new Date(filters.dateFrom)),
@@ -678,6 +732,7 @@ export class ConsultationsRepository {
   async listHistorialExportForCsv(filters: HistorialQuery): Promise<
     {
       row: typeof soConsultations.$inferSelect;
+      attendedByLabel: string;
       diagnosisText: string;
       medicineName: string;
       quantity: number | null;
@@ -693,6 +748,20 @@ export class ConsultationsRepository {
       .limit(HISTORIAL_EXPORT_MAX);
 
     if (consultations.length === 0) return [];
+
+    const creatorIds = [
+      ...new Set(consultations.map((c) => (c.createdBy ?? '').trim()).filter(Boolean)),
+    ];
+    const nameByCreator = new Map<string, string>();
+    if (creatorIds.length > 0) {
+      const wRows = await this.db
+        .select({ id: workers.id, name: workers.name })
+        .from(workers)
+        .where(inArray(workers.id, creatorIds));
+      for (const w of wRows) {
+        nameByCreator.set(w.id.trim(), (w.name ?? w.id).trim());
+      }
+    }
 
     const ids = consultations.map((c) => c.id);
     const dxJoined = await this.db
@@ -736,6 +805,7 @@ export class ConsultationsRepository {
 
     const out: {
       row: typeof soConsultations.$inferSelect;
+      attendedByLabel: string;
       diagnosisText: string;
       medicineName: string;
       quantity: number | null;
@@ -743,6 +813,8 @@ export class ConsultationsRepository {
     }[] = [];
 
     for (const c of consultations) {
+      const attendedByLabel =
+        nameByCreator.get((c.createdBy ?? '').trim()) ?? (c.createdBy ?? '').trim();
       const diag = (dxByC.get(c.id) ?? []).join(', ');
       const rxList = rxByC.get(c.id) ?? [];
       const condLabel =
@@ -750,6 +822,7 @@ export class ConsultationsRepository {
       if (rxList.length === 0) {
         out.push({
           row: c,
+          attendedByLabel,
           diagnosisText: diag,
           medicineName: '',
           quantity: null,
@@ -759,6 +832,7 @@ export class ConsultationsRepository {
         for (const rx of rxList) {
           out.push({
             row: c,
+            attendedByLabel,
             diagnosisText: diag,
             medicineName: rx.medicineName,
             quantity: rx.quantity,

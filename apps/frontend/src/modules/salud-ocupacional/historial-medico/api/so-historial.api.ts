@@ -1,11 +1,14 @@
 import { httpClient } from '@/infrastructure/http/client';
-import type { SoHistorialResponse } from '../types/so-historial.types';
+import type { SoConsultationDetail, SoHistorialResponse } from '../types/so-historial.types';
 
 const BASE = 'salud-ocupacional/consultations';
+
+export type HistorialAttendantOption = { id: string; name: string };
 
 export type HistorialFilterMeta = {
   divisions: string[];
   subdivisions: string[];
+  attendants: HistorialAttendantOption[];
 };
 
 export async function soFetchHistorialFilters(): Promise<HistorialFilterMeta> {
@@ -18,6 +21,7 @@ export type HistorialListParams = {
   search?: string;
   division?: string;
   subdivision?: string;
+  attendedBy?: string;
   dateFrom?: string;
   dateTo?: string;
 };
@@ -33,6 +37,7 @@ export async function soFetchHistorial(
         ...(params.search ? { search: params.search } : {}),
         ...(params.division ? { division: params.division } : {}),
         ...(params.subdivision ? { subdivision: params.subdivision } : {}),
+        ...(params.attendedBy ? { attendedBy: params.attendedBy } : {}),
         ...(params.dateFrom ? { dateFrom: params.dateFrom } : {}),
         ...(params.dateTo ? { dateTo: params.dateTo } : {}),
       },
@@ -40,10 +45,15 @@ export async function soFetchHistorial(
     .json<SoHistorialResponse>();
 }
 
+export async function soFetchConsultationDetail(id: string): Promise<SoConsultationDetail> {
+  return httpClient.get(`${BASE}/${id}`).json<SoConsultationDetail>();
+}
+
 export function buildHistorialCsvDownloadUrl(filters: {
   search?: string;
   division?: string;
   subdivision?: string;
+  attendedBy?: string;
   dateFrom?: string;
   dateTo?: string;
 }): string {
@@ -53,6 +63,7 @@ export function buildHistorialCsvDownloadUrl(filters: {
   if (filters.search) p.set('search', filters.search);
   if (filters.division) p.set('division', filters.division);
   if (filters.subdivision) p.set('subdivision', filters.subdivision);
+  if (filters.attendedBy) p.set('attendedBy', filters.attendedBy);
   if (filters.dateFrom) p.set('dateFrom', filters.dateFrom);
   if (filters.dateTo) p.set('dateTo', filters.dateTo);
   return `/api/${BASE}/historial/export-csv?${p.toString()}`;

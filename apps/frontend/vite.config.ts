@@ -3,6 +3,11 @@ import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+import viteImagemin from '@vheemstra/vite-plugin-imagemin';
+import imageminMozjpeg from 'imagemin-mozjpeg';
+import imageminPngquant from 'imagemin-pngquant';
+import imageminSvgo from 'imagemin-svgo';
+import imageminWebp from 'imagemin-webp';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
@@ -16,6 +21,22 @@ export default defineConfig({
     }),
     react(),
     tailwindcss(),
+    viteImagemin({
+      verbose: false,
+      onlyAssets: true,
+      plugins: {
+        jpg: imageminMozjpeg({ quality: 82 }),
+        png: imageminPngquant(),
+        svg: imageminSvgo(),
+      },
+      makeWebp: {
+        plugins: {
+          jpg: imageminWebp({ quality: 82 }),
+          png: imageminWebp({ quality: 82 }),
+        },
+        skipIfLargerThan: 'optimized',
+      },
+    }),
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {

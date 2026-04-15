@@ -47,12 +47,11 @@ export function StepIdentify({ onIdentified }: Props) {
   return (
     <AuthCard
       title="Iniciar sesión"
-      subtitle="Ingresa tu código de trabajador."
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         <LoginIconInput
           id="sap"
-          label="Código de trabajador"
+          label="Ingresa tu código de trabajador"
           icon={User}
           value={sap}
           onChange={(v) => {

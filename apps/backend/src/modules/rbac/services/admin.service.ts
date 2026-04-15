@@ -192,12 +192,17 @@ function compareStagingRows(
   return ia - ib;
 }
 
-/** Nombre para mostrar desde staging SAP (misma lógica que el directorio de trabajadores). */
+/** Nombre para mostrar desde staging (vorna + apellidos; incluye apellido materno si existe `name2`). */
 function formatStagingWorkerName(
   vorna: string | null | undefined,
   nachn: string | null | undefined,
+  name2?: string | null | undefined,
 ): string {
-  return `${(vorna ?? '').trim()} ${(nachn ?? '').trim()}`.trim();
+  return [vorna, nachn, name2]
+    .map((s) => (s ?? '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
 }
 
 export type WorkerDirectoryRow = {
@@ -254,7 +259,7 @@ export class AdminService {
     for (const code of codes) {
       const w = byPernr.get(code);
       if (!w) continue;
-      const full = formatStagingWorkerName(w.vorna, w.nachn);
+      const full = formatStagingWorkerName(w.vorna, w.nachn, w.name2);
       if (full) {
         out.set(code, full);
       }
@@ -1042,6 +1047,7 @@ export class AdminService {
       .where(inArray(workers.id, workerIds));
 
     const nameById = new Map(nameRows.map((r) => [r.id, r.name]));
+    const sapDisplayById = await this.resolveSapWorkerDisplayNames(workerIds);
 
     type Enriched = {
       worker_id: string;
@@ -1060,6 +1066,8 @@ export class AdminService {
     const fullList: Enriched[] = [...byWorker.entries()].map(
       ([worker_id, assignments]) => {
         const rawName = (nameById.get(worker_id) ?? '').trim();
+        const fromSap = sapDisplayById.get(worker_id)?.trim() ?? '';
+        const displayName = fromSap || rawName;
         const roleSlugs = new Set(assignments.map((a) => a.role_slug));
         const profIds = [
           ...new Set(
@@ -1091,7 +1099,7 @@ export class AdminService {
         }
         return {
           worker_id,
-          display_name: rawName,
+          display_name: displayName,
           app_count,
           assignments: assignments.map((a) => ({
             app_slug: a.app_slug,
@@ -1366,7 +1374,7 @@ export class AdminService {
 
     return sorted.slice(0, 20).map((w) => {
       const name =
-        formatStagingWorkerName(w.vorna, w.nachn).trim() || w.pernr.trim();
+        formatStagingWorkerName(w.vorna, w.nachn, w.name2).trim() || w.pernr.trim();
       return { sap_code: w.pernr.trim(), name };
     });
   }
@@ -2044,7 +2052,7 @@ export class AdminService {
     }
 
     const display =
-      formatStagingWorkerName(best.vorna, best.nachn).trim() ||
+      formatStagingWorkerName(best.vorna, best.nachn, best.name2).trim() ||
       `Worker ${sapCode}`;
 
     await this.db

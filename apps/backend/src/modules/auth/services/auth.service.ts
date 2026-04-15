@@ -10,6 +10,7 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomBytes, randomUUID } from 'node:crypto';
 import * as argon2 from 'argon2';
 import {
@@ -30,7 +31,7 @@ import { eiisDivisiones } from '@core/database/schema-sap/eiis-divisiones';
 import { eiisSubdivisiones } from '@core/database/schema-sap/eiis-subdivisiones';
 import { eiisTrabajadores } from '@core/database/schema-sap/eiis-trabajadores';
 import { PermissionCacheService } from '@modules/rbac/services/permission-cache.service';
-import { LdapService } from './ldap.service';
+import { LdapBindPolicyError, LdapService } from './ldap.service';
 import { EmailService } from './email.service';
 import { SessionService } from './session.service';
 
@@ -103,6 +104,7 @@ export class AuthService {
     @Optional()
     @Inject(SAP_DB)
     private readonly sapDb: PostgresJsDatabase<typeof sapSchema> | null,
+    private readonly config: ConfigService,
     private readonly ldap: LdapService,
     private readonly email: EmailService,
     private readonly sessions: SessionService,
@@ -114,6 +116,12 @@ export class AuthService {
       throw new ServiceUnavailableException('SAP staging no disponible');
     }
     return this.sapDb;
+  }
+
+  /** AD/LDAP según SAP (`correo_corp`) y flag de entorno. */
+  private workerUsesAd(w: StagingWorkerRow): boolean {
+    const enabled = this.config.get<boolean>('LDAP_AD_AUTH_ENABLED', true);
+    return Boolean(enabled) && hasCorreoCorp(w.correoCorp);
   }
 
   private authSessionLogsEnabled(): boolean {
@@ -178,14 +186,6 @@ export class AuthService {
     }
     const display = formatWorkerName(w.vorna ?? '', w.nachn ?? '');
 
-    if (hasCorreoCorp(w.correoCorp)) {
-      return {
-        found: true as const,
-        auth_type: 'ad' as const,
-        worker_name: display,
-      };
-    }
-
     const [local] = await this.samiDb
       .select()
       .from(localAuth)
@@ -196,6 +196,14 @@ export class AuthService {
       return {
         found: true as const,
         auth_type: 'local' as const,
+        worker_name: display,
+      };
+    }
+
+    if (this.workerUsesAd(w)) {
+      return {
+        found: true as const,
+        auth_type: 'ad' as const,
         worker_name: display,
       };
     }
@@ -218,32 +226,13 @@ export class AuthService {
 
     const workerDisplay = formatWorkerName(w.vorna ?? '', w.nachn ?? '');
 
-    if (hasCorreoCorp(w.correoCorp)) {
-      try {
-        await this.ldap.authenticateBySapCode(sapCode, password);
-      } catch {
-        throw new UnauthorizedException({ message: 'Credenciales incorrectas' });
-      }
-      const token = await this.sessions.createSession(
-        sapCode,
-        workerDisplay,
-        'login_ad',
-      );
-      return {
-        requires_password_change: false as const,
-        token,
-      };
-    }
-
     const [row] = await this.samiDb
       .select()
       .from(localAuth)
       .where(eq(localAuth.sapCode, sapCode))
       .limit(1);
 
-    if (!row) {
-      throw new UnauthorizedException({ message: 'Credenciales incorrectas' });
-    }
+    if (row) {
 
     const lockedUntil = row.lockedUntil ? new Date(row.lockedUntil) : null;
     const nowMs = Date.now();
@@ -326,6 +315,36 @@ export class AuthService {
       requires_password_change: true as const,
       temp_token: tempToken,
     };
+    }
+
+    if (this.workerUsesAd(w)) {
+      try {
+        await this.ldap.authenticateAdLogin({
+          sapCode,
+          corporateEmail: w.correoCorp,
+          password,
+        });
+      } catch (e) {
+        if (e instanceof LdapBindPolicyError) {
+          throw new ForbiddenException({
+            message:
+              'La contraseña de la cuenta corporativa en Active Directory está vencida o debe renovarse antes de usar SAMI. Cambiala en un equipo unido al dominio o coordiná con Sistemas.',
+          });
+        }
+        throw new UnauthorizedException({ message: 'Credenciales incorrectas' });
+      }
+      const token = await this.sessions.createSession(
+        sapCode,
+        workerDisplay,
+        'login_ad',
+      );
+      return {
+        requires_password_change: false as const,
+        token,
+      };
+    }
+
+    throw new UnauthorizedException({ message: 'Credenciales incorrectas' });
   }
 
   async register(sapCode: string, dni: string) {
@@ -336,7 +355,7 @@ export class AuthService {
     if (!isTrabajadorActivo(w.stat2)) {
       throw new ForbiddenException({ message: 'Cuenta inactiva' });
     }
-    if (hasCorreoCorp(w.correoCorp)) {
+    if (this.workerUsesAd(w)) {
       throw new BadRequestException({ message: 'DNI incorrecto' });
     }
     if (normalizeDni(w.perid) !== normalizeDni(dni)) {
@@ -385,11 +404,6 @@ export class AuthService {
     if (!isTrabajadorActivo(w.stat2)) {
       throw new ForbiddenException({ message: 'Cuenta inactiva' });
     }
-    if (hasCorreoCorp(w.correoCorp)) {
-      throw new ForbiddenException({
-        message: 'Los usuarios corporativos no pueden recuperar contraseña desde SAMI',
-      });
-    }
     if (normalizeDni(w.perid) !== normalizeDni(dni)) {
       throw new BadRequestException({ message: 'DNI incorrecto' });
     }
@@ -407,6 +421,12 @@ export class AuthService {
       .where(eq(localAuth.sapCode, sapCode))
       .limit(1);
     if (!row) {
+      if (this.workerUsesAd(w)) {
+        throw new ForbiddenException({
+          message:
+            'Los usuarios corporativos no pueden recuperar contraseña desde SAMI. Usá el restablecimiento de tu cuenta de red.',
+        });
+      }
       throw new BadRequestException({ message: 'DNI incorrecto' });
     }
 

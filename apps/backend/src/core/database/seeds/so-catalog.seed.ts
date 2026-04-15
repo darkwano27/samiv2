@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { and, eq } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../schema';
@@ -80,188 +83,6 @@ const RAW_MEDICINES: [string, string, string, string][] = [
   ['ARNICA SPORT', '10% - 1% - 1%', 'AEROSOL', 'TOPICA'],
 ];
 
-/** Origen: lista clínica (cabecera `DIAGNOSTICO` omitida). */
-const RAW_DIAGNOSES = `
-ABORTO ESPONTANEO
-ABSCESO CUTANEO
-ABSCESO PERIANAL
-ABSCESO PERIODONTAL
-ACCIDENTE CEREBROVASCULAR
-ADENOPATIA INGUINAL
-AMENAZA DE ABORTO
-ANEMIA AGUDA
-APENDICITIS AGUDA
-ARTRALGIA
-ARTRITIS REUMATOIDE
-ARTROSIS
-ASMA ALERGICA
-ASMA BRONQUIAL
-ATRICCION
-BRONQUIECTASIA
-BRONQUITIS AGUDA
-BURSITIS
-CALCULO URINARIO
-CALCULO VESICULAR
-CATARATA
-CEFALEA
-CELULITIS
-CERVICALGIA
-CERVICITIS
-CHALAZION
-PTERIGION
-COLECISTECTOMIA
-COLECISTITIS AGUDA
-COLEDOCOCELE
-COLELITIASIS AGUDA
-COLICO MENSTRUAL
-COLICO RENAL
-COLICO VESICULAR
-CONDILOMA ACUMINADO
-CONDROMALACIA
-CONJUNTIVITIS AGUDA
-CONSTIPACION
-CONTRACTURA MUSCULAR
-CONTUSION
-CONVULSION NO ESPECIFICADA
-COSTOCONDRITIS AGUDA
-DENGUE
-DERMATITIS ALERGICA
-DESGARRO DE LIGAMENTO
-DESGARRO DE MENISCOS
-DESGARRO DE RETINA
-DESGARRO DE TENDON
-DESGARRO MUSCULAR
-DESPRENDIMIENTO DE LA RETINA
-DIABETES MELLITUS TIPO II
-DISMENORREA
-DISPEPSIA
-DOLOR ABDOMINAL
-DORSALGIA AGUDA
-EFECTOS ADVERSOS DE LA INMUNIZACIÓN
-ENDODONCIA
-ENDOMETRIOSIS
-ENFERMEDAD DE MENIERE
-ENFERMEDAD INFLAMATORIA PELVICA
-ENFERMEDAD PULMONAR AGUDA
-ENTESOPATIA DEL TENDON
-EPICONDILITIS AGUDA
-EPIDIDIMITIS
-EPILEPSIA
-EPISTAXIS
-ESCABIOSIS
-ESCOLIOSIS
-ESGUINCE
-ESPOLON CALCANEO
-ESTRABISMO
-EXODONCIA
-FASCITIS PLANTAR
-FIBRILACION AURICULAR PAROXISTICA
-FIBROADENOMA DE MAMA
-FIBROSIS PULMONAR
-FISURA
-FRACTURA
-GANGLION
-GASTRITIS AGUDA
-GINECORRAGIA
-GINGIVITIS
-GONARTROSIS
-HEMATURIA EAD
-HEMOPTISIS
-HEMORRAGIA UTERINA DISFUNCIONAL
-HEMORROIDES
-HEPATOPATIA DIFUSA
-HERIDA
-HERPES LABIAL
-HERPES ZOSTER
-HIPERCOLESTEROLEMIA
-HIPEREMESIS GRAVIDICA
-HIPERPLASIA PROSTATICA BENIGNA
-HIPERTENSION ARTERIAL
-HIPERTROFIA DE LOS CORNETES NASALES
-HIPOACUSIA SUBITA IDIOPATICA
-INFECCION DE TRACTO URINARIO
-INFECCION GASTROINTESTINAL AGUDA
-INFECCION RESPIRATORIA AGUDA
-INSUFICIENCIA RENAL CRONICA
-INSUFICIENCIA VENOSA
-INTOXICACION ALIMENTARIA
-LABERINTITIS AGUDA
-LARINGITIS AGUDA
-LARINGOTRAQUEITIS AGUDA
-LESION DE NERVIO RADIAL
-LIPOMA
-LITIASIS RENAL
-LUMBALGIA AGUDA
-LUMBOCIATALGIA
-LUXACION
-MIASTENIA GRAVIS
-MICOSIS
-MIGRAÑA
-MIGRAÑA CON AURA
-MIOMATOSIS UTERINA
-MORDEDURA POR CAN
-NECROSIS PULPAR
-NEUMONIA
-OBSTRUCCION INTESTINAL
-ONICOCRIPTOSIS
-ONICOMICOSIS
-ORQUITIS, EPIDIMITIS Y ORQUIEPIDIDIMITIS
-ORZUELO
-OSTEOPOROSIS
-OTITIS MEDIA AGUDA
-OVARIO POLIQUISTICO
-PAPILOMA EN MUSLO
-PARALISIS FACIAL
-PARONIQUIA
-PERIODONTITIS AGUDA
-PIE DIABETICO
-PIELONEFRITIS
-POLICONTUSO
-POLIPO VESICULAR
-PRESBICIA
-PROLAPSO VAGINAL
-PROSTATITIS AGUDA
-PSORIASIS
-PULPITIS IRREVERSIBLE
-QUEILITIS ANGULAR
-QUEMADURA
-QUISTE EPIDERMICO
-QUISTE HEMORRAGICO
-QUISTE PILONIDAL
-QUISTE SINOVIAL
-QUISTE TESTICULAR
-REACCION ALERGICA CUTANEA
-REFLUJO GASTROESOFAGICO
-RINITIS ALERGICA
-SACROLUMBALGIA AGUDA
-SEPTOPLASTIA
-SINDROME DE COLON IRRITABLE
-SINDROME DEL MANGUITO ROTADOR
-SINDROME DEL TUNEL CARPIANO
-SINDROME DOLOROSO ABDOMINAL
-SINDROME EMETICO
-SINDROME VERTIGINOSO
-SINUSITIS AGUDA
-TBC PULMONAR
-TENDINITIS
-TOS FERINA
-TRANSTORNO DE PANICO
-TRAQUEITIS
-TRASTORNO DE DISCO CERVICAL
-TRASTORNOS DE LA ARTICULACION MAXILAR
-TRASTORNOS DE LA REFRACCIÓN
-TRAUMATISMO
-ULCERA DE ESOFAGO
-UÑA ENCARNADA
-URTICARIA
-VAGINOSIS BACTERIANA
-VARICES EN MIEMBROS INFERIORES
-VASECTOMIA
-VERTIGO POSTURAL PAROXISTICO
-VOLVULO
-VULVOVAGINITIS
-`.trim();
-
 const PRES_MAP: Record<string, string> = {
   TABLETA: 'Tableta',
   MATERIAL: 'Material',
@@ -315,19 +136,40 @@ function inventoryUnitForPresentation(presentationCanon: string): string {
   }
 }
 
-function parseDiagnosisNames(): string[] {
+function loadCie10Raw(): string {
+  return readFileSync(
+    join(process.cwd(), 'src/core/database/seeds/so-diagnoses-cie10.raw.txt'),
+    'utf8',
+  );
+}
+
+/** Líneas `NOMBRE — Código` (separador em dash con espacios). */
+function parseCie10Lines(raw: string): { name: string; code: string }[] {
   const seen = new Set<string>();
-  const out: string[] = [];
-  for (const line of RAW_DIAGNOSES.split('\n')) {
-    const name = line.trim().replace(/\s+/g, ' ');
-    if (!name) continue;
-    const key = name.toUpperCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
+  const out: { name: string; code: string }[] = [];
+  const sep = ' — ';
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim().replace(/\s+/g, ' ');
+    if (!trimmed) continue;
+    const idx = trimmed.indexOf(sep);
+    if (idx === -1) {
+      throw new Error(`Línea CIE-10 inválida (falta " — "): ${trimmed.slice(0, 80)}`);
+    }
+    const name = trimmed.slice(0, idx).trim();
+    const code = trimmed.slice(idx + sep.length).trim();
+    if (!name || !code) {
+      throw new Error(`Línea CIE-10 inválida: ${trimmed}`);
+    }
     if (name.length > 200) {
       throw new Error(`Diagnóstico demasiado largo (${name.length}): ${name.slice(0, 40)}…`);
     }
-    out.push(name);
+    if (code.length > 20) {
+      throw new Error(`Código CIE-10 demasiado largo (${code.length}): ${code}`);
+    }
+    const key = name.toUpperCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, code });
   }
   return out;
 }
@@ -335,24 +177,38 @@ function parseDiagnosisNames(): string[] {
 export async function runSoCatalogSeed(db: Db): Promise<{
   diagnosesInserted: number;
   diagnosesSkipped: number;
+  diagnosesUpdated: number;
   medicinesInserted: number;
   medicinesSkipped: number;
 }> {
   let diagnosesInserted = 0;
   let diagnosesSkipped = 0;
-  const dxNames = parseDiagnosisNames();
+  let diagnosesUpdated = 0;
+  const dxRows = parseCie10Lines(loadCie10Raw());
 
-  for (const name of dxNames) {
+  for (const { name, code } of dxRows) {
     const [existing] = await db
-      .select({ id: soDiagnoses.id })
+      .select({
+        id: soDiagnoses.id,
+        code: soDiagnoses.code,
+      })
       .from(soDiagnoses)
       .where(eq(soDiagnoses.name, name))
       .limit(1);
     if (existing) {
-      diagnosesSkipped += 1;
+      const prev = (existing.code ?? '').trim();
+      if (prev !== code) {
+        await db
+          .update(soDiagnoses)
+          .set({ code })
+          .where(eq(soDiagnoses.id, existing.id));
+        diagnosesUpdated += 1;
+      } else {
+        diagnosesSkipped += 1;
+      }
       continue;
     }
-    await db.insert(soDiagnoses).values({ name });
+    await db.insert(soDiagnoses).values({ name, code });
     diagnosesInserted += 1;
   }
 
@@ -399,6 +255,7 @@ export async function runSoCatalogSeed(db: Db): Promise<{
   return {
     diagnosesInserted,
     diagnosesSkipped,
+    diagnosesUpdated,
     medicinesInserted,
     medicinesSkipped,
   };

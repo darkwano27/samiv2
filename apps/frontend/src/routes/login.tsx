@@ -1,9 +1,11 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { HTTPError } from 'ky';
+import { useEffect } from 'react';
 import { httpClient } from '@/infrastructure/http/client';
 import { LoginFlow } from '@/modules/auth/components/login/LoginFlow';
 import { LoginHeroBackdrop } from '@/modules/auth/components/shared/LoginHeroBackdrop';
 import { LoginMarketingBlock } from '@/modules/auth/components/shared/LoginMarketingBlock';
+import { LOGIN_HERO_WEBP_SRC } from '@/modules/auth/constants/login-assets';
 
 const COPYRIGHT_YEAR = new Date().getFullYear();
 
@@ -23,6 +25,19 @@ export const Route = createFileRoute('/login')({
 });
 
 function LoginPage() {
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.type = 'image/webp';
+    link.href = LOGIN_HERO_WEBP_SRC;
+    link.setAttribute('data-sami', 'login-hero');
+    document.head.appendChild(link);
+    return () => {
+      link.remove();
+    };
+  }, []);
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain md:min-h-0 md:bg-background">
       {/*
