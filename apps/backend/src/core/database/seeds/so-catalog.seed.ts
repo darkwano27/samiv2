@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from '../schema';
 import { soDiagnoses, soMedicines } from '../schema/salud-ocupacional';
@@ -153,7 +153,7 @@ function parseCie10Lines(raw: string): { name: string; code: string }[] {
     if (!trimmed) continue;
     const idx = trimmed.indexOf(sep);
     if (idx === -1) {
-      throw new Error(`Línea CIE-10 inválida (falta " — "): ${trimmed.slice(0, 80)}`);
+      continue;
     }
     const name = trimmed.slice(0, idx).trim();
     const code = trimmed.slice(idx + sep.length).trim();
@@ -175,42 +175,35 @@ function parseCie10Lines(raw: string): { name: string; code: string }[] {
 }
 
 export async function runSoCatalogSeed(db: Db): Promise<{
+  /** Catálogo `so_diagnoses` reemplazado desde `so-diagnoses-cie10.raw.txt`. */
+  soDiagnosesReplaced: number;
+  /** Se borraron filas N:N consulta↔diagnóstico (consultas siguen existiendo). */
+  consultationDiagnosisLinksCleared: boolean;
   diagnosesInserted: number;
   diagnosesSkipped: number;
   diagnosesUpdated: number;
   medicinesInserted: number;
   medicinesSkipped: number;
 }> {
-  let diagnosesInserted = 0;
-  let diagnosesSkipped = 0;
-  let diagnosesUpdated = 0;
   const dxRows = parseCie10Lines(loadCie10Raw());
-
-  for (const { name, code } of dxRows) {
-    const [existing] = await db
-      .select({
-        id: soDiagnoses.id,
-        code: soDiagnoses.code,
-      })
-      .from(soDiagnoses)
-      .where(eq(soDiagnoses.name, name))
-      .limit(1);
-    if (existing) {
-      const prev = (existing.code ?? '').trim();
-      if (prev !== code) {
-        await db
-          .update(soDiagnoses)
-          .set({ code })
-          .where(eq(soDiagnoses.id, existing.id));
-        diagnosesUpdated += 1;
-      } else {
-        diagnosesSkipped += 1;
-      }
-      continue;
-    }
-    await db.insert(soDiagnoses).values({ name, code });
-    diagnosesInserted += 1;
+  if (dxRows.length === 0) {
+    throw new Error(
+      'so-diagnoses-cie10.raw.txt: sin filas válidas (formato `NOMBRE — CÓDIGO`); abortando para no vaciar el catálogo.',
+    );
   }
+
+  await db.execute(sql.raw('DELETE FROM so_consultation_diagnoses'));
+  await db.execute(sql.raw('DELETE FROM so_diagnoses'));
+
+  if (dxRows.length > 0) {
+    await db.insert(soDiagnoses).values(
+      dxRows.map(({ name, code }) => ({ name, code })),
+    );
+  }
+
+  const diagnosesInserted = dxRows.length;
+  const diagnosesSkipped = 0;
+  const diagnosesUpdated = 0;
 
   let medicinesInserted = 0;
   let medicinesSkipped = 0;
@@ -253,6 +246,8 @@ export async function runSoCatalogSeed(db: Db): Promise<{
   }
 
   return {
+    soDiagnosesReplaced: dxRows.length,
+    consultationDiagnosisLinksCleared: true,
     diagnosesInserted,
     diagnosesSkipped,
     diagnosesUpdated,

@@ -43,14 +43,15 @@ export function AddPrescriptionModal({ open, onClose, onAdd, onOpenCatalog }: Pr
   }
 
   function handleAdd() {
-    if (!picked || quantity < 1) return;
+    const q = Math.floor(Number(quantity));
+    if (!picked || !Number.isFinite(q) || q < 0) return;
     onAdd({
       medicineId: picked.id,
       medicineLabel: picked.name,
       concentration: picked.concentration,
       presentation: picked.presentation,
       administrationRoute: picked.administrationRoute,
-      quantity: Math.floor(quantity),
+      quantity: q,
       frequency: frequency.trim() || undefined,
       duration: duration.trim() || undefined,
       instructions: instructions.trim() || undefined,
@@ -182,9 +183,17 @@ export function AddPrescriptionModal({ open, onClose, onAdd, onOpenCatalog }: Pr
               <Input
                 id="so-rx-qty"
                 type="number"
-                min={1}
+                min={0}
                 value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value) || 1)}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setQuantity(0);
+                    return;
+                  }
+                  const v = Number(raw);
+                  setQuantity(Number.isFinite(v) ? Math.max(0, Math.floor(v)) : 0);
+                }}
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -205,7 +214,11 @@ export function AddPrescriptionModal({ open, onClose, onAdd, onOpenCatalog }: Pr
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" onClick={handleAdd} disabled={!picked || quantity < 1}>
+          <Button
+            type="button"
+            onClick={handleAdd}
+            disabled={!picked || !Number.isFinite(quantity) || quantity < 0}
+          >
             Agregar
           </Button>
         </div>

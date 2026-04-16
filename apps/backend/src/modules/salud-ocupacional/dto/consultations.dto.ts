@@ -73,7 +73,7 @@ const prescriptionItemSchema = z.object({
   medicineId: z.string().uuid(),
   frequency: z.string().max(100).optional(),
   duration: z.string().max(100).optional(),
-  quantity: z.number().int().positive(),
+  quantity: z.number().int().min(0),
   instructions: z.string().optional(),
 });
 

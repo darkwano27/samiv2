@@ -326,9 +326,6 @@ export function RegistroConsultaView() {
         <h1 className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
           Registro de consulta
         </h1>
-        <p className="mt-1 text-xs leading-snug text-muted-foreground sm:text-sm">
-          Salud ocupacional — completá los bloques y guardá al final.
-        </p>
       </div>
 
       {formError ? (

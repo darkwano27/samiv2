@@ -36,7 +36,7 @@ export const soPrescriptions = pgTable(
     instructions: text('instructions'),
   },
   (t) => ({
-    chkQty: check('so_prescriptions_quantity_check', sql`${t.quantity} > 0`),
+    chkQty: check('so_prescriptions_quantity_check', sql`${t.quantity} >= 0`),
     idxConsultation: index('idx_so_prescriptions_consultation_id').on(
       t.consultationId,
     ),

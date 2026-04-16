@@ -295,12 +295,6 @@ const styles = StyleSheet.create({
   sigImgProf: { width: 230, height: 72, objectFit: 'contain' as const },
 });
 
-const DISCHARGE_LABEL: Record<string, string> = {
-  observacion: 'Observación',
-  recuperado: 'Recuperado / Alta',
-  derivado: 'Derivado',
-};
-
 function fmtDateTime(d: Date | string): string {
   const x = d instanceof Date ? d : new Date(d);
   if (Number.isNaN(x.getTime())) return '—';
@@ -341,8 +335,8 @@ export function ConsultationPdfDocument({
   logoSrc,
   attentionRowVariant = 'attended_by',
 }: Props) {
-  const discharge =
-    DISCHARGE_LABEL[detail.dischargeCondition] ?? detail.dischargeCondition;
+  /** Valor persistido tal cual (`observacion` | `recuperado` | `derivado`). */
+  const dischargeCondition = detail.dischargeCondition;
 
   const patientSig = detail.signatureData?.trim();
   const hasPatientSig = isRenderableImageDataUrl(patientSig);
@@ -446,7 +440,7 @@ export function ConsultationPdfDocument({
               <Text style={styles.cellVal}>{fmtDateTime(detail.attentionDate)}</Text>
               <Text style={[styles.cellLabel, { width: '26%' }]}>CONDICIÓN AL ALTA</Text>
               <View style={[styles.cellVal, { flex: 0.5, justifyContent: 'center' }]}>
-                <Text style={styles.badge}>{discharge}</Text>
+                <Text style={styles.badge}>{dischargeCondition}</Text>
               </View>
             </View>
             {referredNameOnly ? (
@@ -475,7 +469,8 @@ export function ConsultationPdfDocument({
           </View>
           <View style={styles.clinicalBox}>
             <View style={styles.dxHeaderClinical}>
-              <Text style={[styles.dxThClinical, { width: '12%' }]}>#</Text>
+              <Text style={[styles.dxThClinical, { width: '10%' }]}>#</Text>
+              <Text style={[styles.dxThClinical, { width: '22%' }]}>CIE-10</Text>
               <Text style={[styles.dxThClinical, { flex: 1, borderRightWidth: 0 }]}>
                 DIAGNÓSTICO
               </Text>
@@ -494,9 +489,18 @@ export function ConsultationPdfDocument({
                   ]}
                 >
                   <Text
-                    style={[styles.dxCellClinical, { width: '12%', textAlign: 'center' }]}
+                    style={[styles.dxCellClinical, { width: '10%', textAlign: 'center' }]}
                   >
                     {i + 1}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.dxCellClinical,
+                      styles.dxCode,
+                      { width: '22%', fontSize: 7.5 },
+                    ]}
+                  >
+                    {(d.code ?? '').trim() || '—'}
                   </Text>
                   <Text style={[styles.dxCellClinical, styles.dxNameClinical, { flex: 1, borderRightWidth: 0 }]}>
                     {d.name}

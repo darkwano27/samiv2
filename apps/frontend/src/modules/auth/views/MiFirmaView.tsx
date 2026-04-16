@@ -99,8 +99,7 @@ export function MiFirmaView() {
       <div>
         <h1 className="font-heading text-xl font-semibold tracking-tight md:text-2xl">Mi firma</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Firma con el dedo o subí una imagen (sello escaneado). Se usa en PDFs donde actuás como
-          profesional o técnico — por ejemplo actas en Sistemas y documentos en Salud Ocupacional.
+          Firma con el dedo o sube una imagen (sello escaneado).
         </p>
       </div>
 
@@ -142,7 +141,7 @@ export function MiFirmaView() {
                   />
                 ) : (
                   <p className="text-center text-sm text-muted-foreground">
-                    Todavía no tenés firma guardada. Dibujá una o subí una imagen abajo.
+                    Todavía no tienes una  firma guardada.
                   </p>
                 )}
               </div>
@@ -223,7 +222,7 @@ export function MiFirmaView() {
                     disabled={busy}
                     onClick={() => applyPatch({ drawn_base64: null })}
                   >
-                    Quitar firma dibujada
+                    Eliminar Firma
                   </Button>
                 ) : null}
                 {data?.has_uploaded ? (
